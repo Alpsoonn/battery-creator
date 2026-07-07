@@ -1,0 +1,2307 @@
+<!doctype html>
+<html lang="pl">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Konfigurator pakietu baterii do ramy roweru</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+
+    :root {
+      color-scheme: dark;
+      --ink: #e2e8f0;
+      --muted: #94a3b8;
+      --line: #2d3748;
+      --panel: #1a202c;
+      --soft: #1e2533;
+      --bg: #111827;
+      --accent: #14b8a6;
+      --accent-2: #f59e0b;
+      --danger: #f87171;
+      --cell-stroke: #0f172a;
+      --frame: #e2e8f0;
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    main {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(300px, 390px) minmax(0, 1fr);
+    }
+
+    aside {
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      padding: 18px;
+      overflow: auto;
+      max-height: 100vh;
+    }
+
+    .stage {
+      padding: 18px;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: 22px;
+      line-height: 1.15;
+      letter-spacing: 0;
+      color: #f1f5f9;
+      font-weight: 800;
+    }
+
+    h2 {
+      margin: 18px 0 8px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+      margin: 9px 0;
+      color: #cbd5e1;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #0f172a;
+      color: var(--ink);
+      border-radius: 7px;
+      padding: 9px 10px;
+      font: inherit;
+      min-height: 40px;
+      transition: border-color .15s;
+    }
+
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      padding: 0 10px;
+      /* Odsunięcie kulki od krawędzi o 8px dla idealnego wycentrowania wewnątrz zaokrąglonego tła */
+      height: 6px;
+      background: var(--line);
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      min-height: 18px;
+      accent-color: var(--accent);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-top: 10px;
+      color: #cbd5e1;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .check span {
+      flex: 1;
+    }
+
+    .help {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    button {
+      border: 0;
+      background: var(--accent);
+      color: #0f172a;
+      min-height: 42px;
+      padding: 10px 12px;
+      border-radius: 7px;
+      font: inherit;
+      font-weight: 750;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+    }
+
+    button:hover {
+      opacity: .85;
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button.secondary {
+      background: #2d3748;
+      color: var(--ink);
+    }
+
+    button:disabled {
+      opacity: .45;
+      cursor: wait;
+      transform: none;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+      margin-top: 14px;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      border: 1px solid var(--line);
+      background: #1e2533;
+      border-radius: 7px;
+      padding: 5px 9px;
+      color: #e2e8f0;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .canvas-shell {
+      background: #0f172a;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      min-height: 450px;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr);
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+      min-height: 450px;
+      display: block;
+      background:
+        linear-gradient(rgba(255, 255, 255, .03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, .03) 1px, transparent 1px);
+      background-size: 22px 22px;
+      background-color: #0f172a;
+    }
+
+    .variants {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .variant {
+      border: 1px solid var(--line);
+      background: #1e2533;
+      border-radius: 8px;
+      padding: 10px;
+      cursor: pointer;
+      min-height: 92px;
+      transition: border-color .15s, background .15s;
+      position: relative;
+      text-align: left;
+    }
+
+    .variant:hover {
+      border-color: var(--accent);
+      background: #22303f;
+    }
+
+    .variant.active {
+      outline: 2px solid var(--accent);
+      border-color: transparent;
+      background: #163b38;
+    }
+
+    .variant strong {
+      display: block;
+      font-size: 15px;
+      margin-bottom: 5px;
+      color: #f1f5f9;
+    }
+
+    .variant span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .variant-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 30px;
+      gap: 8px;
+      align-items: start;
+    }
+
+    .gear-btn {
+      width: 30px;
+      height: 30px;
+      min-height: 30px;
+      padding: 0;
+      border-radius: 7px;
+      background: #2d3748;
+      color: #e2e8f0;
+      display: inline-grid;
+      place-items: center;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .gear-btn:hover {
+      background: var(--accent);
+    }
+
+    .variant-menu {
+      margin-top: 10px;
+      padding-top: 9px;
+      border-top: 1px solid rgba(255, 255, 255, .08);
+      display: grid;
+      gap: 7px;
+    }
+
+    .variant-menu label {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .variant-menu-value {
+      color: #e2e8f0;
+      font-weight: 800;
+    }
+
+    .config-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .config {
+      border: 1px solid var(--line);
+      background: #1e2533;
+      border-radius: 7px;
+      padding: 8px;
+      font-size: 13px;
+      color: var(--ink);
+    }
+
+    .config.active {
+      background: #163b38;
+      border-color: var(--accent);
+    }
+
+    .status {
+      margin-top: 10px;
+      padding: 9px 10px;
+      border-radius: 7px;
+      background: #172035;
+      color: #93c5fd;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .progress {
+      height: 6px;
+      margin-top: 8px;
+      border-radius: 999px;
+      background: #2d3748;
+      overflow: hidden;
+    }
+
+    .progress i {
+      display: block;
+      width: 0;
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #6ee7e7);
+      transition: width .18s ease;
+    }
+
+    .status.error {
+      background: #2d1515;
+      color: var(--danger);
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend i {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, .2);
+      display: inline-block;
+      vertical-align: -2px;
+      margin-right: 4px;
+    }
+
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        max-height: none;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .variants {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .active-config-card {
+      grid-column: span 2;
+      border: 1px solid var(--line);
+      background: var(--soft);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 6px;
+    }
+
+    .active-config-title {
+      font-size: 13.5px;
+      font-weight: 750;
+      color: var(--accent);
+      margin-bottom: 10px;
+      border-bottom: 1.5px solid var(--line);
+      padding-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .active-config-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 7px;
+    }
+
+    .active-config-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      line-height: 1.35;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.07);
+      padding-bottom: 4px;
+    }
+
+    .active-config-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .active-config-label {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .active-config-value {
+      font-weight: 750;
+      color: var(--ink);
+    }
+
+    #connectionWarnings {
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      background: #1e0a0a;
+      border: 1px solid #ef4444;
+      border-radius: 8px;
+      margin-top: -4px;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <aside>
+      <h1>Konfigurator pakietu baterii w trójkącie ramy</h1>
+
+      <h2>Trójkąt ramy</h2>
+      <div class="row">
+        <label>Bok A [mm]<input id="sideA" type="number" min="1" step="1" value="500"></label>
+        <label>Bok B [mm]<input id="sideB" type="number" min="1" step="1" value="600"></label>
+      </div>
+      <label>Bok C [mm]<input id="sideC" type="number" min="1" step="1" value="250"></label>
+      <p class="help">Program sam ustawia bok średniej długości poziomo na górze, najkrótszy po prawej, a najdłuższy po
+        lewej.</p>
+
+      <h2>Ogniwa i luz</h2>
+      <div class="row">
+        <label>Typ ogniwa
+          <select id="cellType">
+            <option value="18">18650, średnica 18 mm</option>
+            <option value="21">21700, średnica 21 mm</option>
+          </select>
+        </label>
+        <label>Układ
+          <select id="layoutMode">
+            <option value="both">Honeycomb i kwadrat</option>
+            <option value="honeycomb">Tylko honeycomb</option>
+            <option value="square">Tylko kwadrat</option>
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <label>Margines ramy [mm]<input id="frameMargin" type="number" min="0" step=".5" value="8"></label>
+        <label>Odstęp ogniw [mm]<input id="cellGap" type="number" min="0" step=".2" value="1.2"></label>
+      </div>
+      <div class="row">
+        <label>Krok kąta [°]<input id="angleStep" type="number" min="1" max="15" step="1" value="3"></label>
+        <label>Gęstość przesuwania
+          <select id="offsetDensity">
+            <option value="5">Dokładna</option>
+            <option value="4" selected>Normalna</option>
+            <option value="3">Szybka</option>
+          </select>
+        </label>
+      </div>
+
+      <h2>Sterownik</h2>
+      <label class="check"><input id="controllerOn" type="checkbox" checked><span>Uwzględnij miejsce na
+          sterownik</span></label>
+      <div class="row">
+        <label>Szerokość [mm]<input id="controllerW" type="number" min="1" step="1" value="90"></label>
+        <label>Wysokość [mm]<input id="controllerH" type="number" min="1" step="1" value="45"></label>
+      </div>
+      <label class="check"><input id="controllerRotate" type="checkbox" checked><span>Dobierz też kąt
+          sterownika</span></label>
+
+      <h2>Konfiguracja elektryczna</h2>
+      <label>Napięcie nominalne
+        <select id="seriesSelect">
+          <option value="7">7s, 25.9 V</option>
+          <option value="10" selected>10s, 36 V</option>
+          <option value="13">13s, 48 V</option>
+          <option value="14">14s, 52 V</option>
+          <option value="16">16s, 60 V</option>
+          <option value="20">20s, 72 V</option>
+          <option value="custom">Własne S</option>
+        </select>
+      </label>
+      <label id="customSLabel" style="display:none">Liczba sekcji S<input id="customS" type="number" min="1" step="1"
+          value="12"></label>
+      <div class="row">
+        <label>Pojemność ogniwa [Ah]<input id="cellAh" type="number" min="0" step=".1" value="5"></label>
+        <label>Prąd ogniwa [A]<input id="cellCurrent" type="number" min="0" step=".1" value="10"></label>
+      </div>
+      <label>Napięcie nominalne ogniwa [V]<input id="cellVoltage" type="number" min="0" step=".01" value="3.6"></label>
+      <p class="help">Kolory pokazują sekcje szeregowe. Numer w ogniwie oznacza pozycję ogniwa równoległego w danej
+        sekcji.</p>
+
+      <div class="actions">
+        <button id="solveBtn">Przelicz</button>
+        <button id="demoBtn" class="secondary">Przykład</button>
+      </div>
+      <div id="status" class="status">Gotowe do obliczeń.</div>
+      <div class="progress" aria-hidden="true"><i id="progressBar"></i></div>
+      <div id="configs" class="config-list"></div>
+    </aside>
+
+    <section class="stage">
+      <div class="toolbar">
+        <div id="summary" class="summary"></div>
+        <button id="exportBtn" class="secondary">Eksport SVG</button>
+      </div>
+      <div class="canvas-shell">
+        <svg id="drawing" role="img" aria-label="Wizualizacja pakietu baterii"></svg>
+      </div>
+      <div id="connectionWarnings" style="display:none"></div>
+      <div>
+        <div id="variants" class="variants"></div>
+        <div id="legend" class="legend"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const colors = [
+      "#2b6cb0", "#c05621", "#2f855a", "#805ad5", "#b83280",
+      "#0f766e", "#b7791f", "#4a5568", "#dd6b20", "#3182ce",
+      "#38a169", "#9f7aea", "#d53f8c", "#319795", "#718096",
+      "#e53e3e", "#667eea", "#975a16", "#2c7a7b", "#6b46c1"
+    ];
+
+    let variants = [];
+    let activeIndex = 0;
+    let solveRunId = 0;
+    let activeVariantTab = 0;
+    let openVariantSettings = null;
+    const sectionVariantSettings = {
+      edgeWeight: 5
+    };
+    const cornerNames = ["lewy górny", "prawy górny", "dolny"];
+
+    // System manualnej zamiany ogniw między sekcjami
+    let selectedCellId = null;  // id ogniwa aktualnie wybranego
+    let cellOverrides = {};     // { cellId: newSection } – trwałe zamiany użytkownika
+
+    // Stan trybu ręcznego rysowania cel
+    let manualMode = false;
+    let manualS = 10;
+    let manualP = 16;
+    let activeDrawSec = 0;   // 0 = S1, 1 = S2, etc.
+    let manualVariant = null; // Specjalny wariant trzymający stan wszystkich ogniw i ich sekcji
+
+    function readNumber(id) {
+      const value = Number($(id).value);
+      return Number.isFinite(value) ? value : 0;
+    }
+
+    function triangleFromSides(values) {
+      const sides = [...values].sort((a, b) => a - b);
+      const shortest = sides[0], top = sides[1], longest = sides[2];
+      if (shortest + top <= longest) {
+        throw new Error("Podane boki nie tworzą trójkąta. Suma dwóch krótszych boków musi być większa od najdłuższego.");
+      }
+      const x = (longest * longest - shortest * shortest + top * top) / (2 * top);
+      const y2 = longest * longest - x * x;
+      if (y2 <= 0) throw new Error("Nie da się złożyć stabilnego trójkąta z tych wymiarów.");
+      const y = Math.sqrt(y2);
+      return {
+        points: [{ x: 0, y: 0 }, { x: top, y: 0 }, { x, y }],
+        shortest, top, longest
+      };
+    }
+
+    function edgeDistance(p, a, b) {
+      const vx = b.x - a.x, vy = b.y - a.y;
+      const wx = p.x - a.x, wy = p.y - a.y;
+      const c1 = vx * wx + vy * wy;
+      if (c1 <= 0) return Math.hypot(p.x - a.x, p.y - a.y);
+      const c2 = vx * vx + vy * vy;
+      if (c2 <= c1) return Math.hypot(p.x - b.x, p.y - b.y);
+      const t = c1 / c2;
+      return Math.hypot(p.x - (a.x + t * vx), p.y - (a.y + t * vy));
+    }
+
+    function pointInTriangle(p, tri, margin = 0) {
+      const [a, b, c] = tri;
+      const d1 = sign(p, a, b);
+      const d2 = sign(p, b, c);
+      const d3 = sign(p, c, a);
+      const hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
+      const hasPos = d1 > 0 || d2 > 0 || d3 > 0;
+      if (hasNeg && hasPos) return false;
+      if (margin <= 0) return true;
+      return edgeDistance(p, a, b) >= margin &&
+        edgeDistance(p, b, c) >= margin &&
+        edgeDistance(p, c, a) >= margin;
+    }
+
+    function sign(p1, p2, p3) {
+      return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+    }
+
+    function rotatePoint(p, angle) {
+      const ca = Math.cos(angle), sa = Math.sin(angle);
+      return { x: p.x * ca - p.y * sa, y: p.x * sa + p.y * ca };
+    }
+
+    function polygonBounds(points) {
+      return {
+        minX: Math.min(...points.map(p => p.x)),
+        maxX: Math.max(...points.map(p => p.x)),
+        minY: Math.min(...points.map(p => p.y)),
+        maxY: Math.max(...points.map(p => p.y))
+      };
+    }
+
+    function generateGrid(tri, opts, layout, angleDeg, ox, oy) {
+      const radius = opts.cellDiameter / 2;
+      const pitch = opts.cellDiameter + opts.cellGap;
+      const angle = angleDeg * Math.PI / 180;
+      const bounds = polygonBounds(tri);
+      const span = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) + pitch * 8;
+      const cells = [];
+      const rowStep = layout === "honeycomb" ? pitch * Math.sqrt(3) / 2 : pitch;
+      const colStep = pitch;
+      let id = 0;
+
+      for (let row = -Math.ceil(span / rowStep); row <= Math.ceil(span / rowStep); row++) {
+        for (let col = -Math.ceil(span / colStep); col <= Math.ceil(span / colStep); col++) {
+          const stagger = layout === "honeycomb" && row % 2 !== 0 ? colStep / 2 : 0;
+          const local = {
+            x: col * colStep + stagger + ox,
+            y: row * rowStep + oy
+          };
+          const rp = rotatePoint(local, angle);
+          const p = {
+            x: rp.x + (bounds.minX + bounds.maxX) / 2,
+            y: rp.y + (bounds.minY + bounds.maxY) / 2
+          };
+          if (p.x < bounds.minX - pitch || p.x > bounds.maxX + pitch || p.y < bounds.minY - pitch || p.y > bounds.maxY + pitch) continue;
+          if (pointInTriangle(p, tri, opts.frameMargin + radius)) {
+            cells.push({ x: p.x, y: p.y, id: id++, row, col });
+          }
+        }
+      }
+      return cells;
+    }
+
+    function rotatedRectCorners(rect) {
+      const angle = (rect.angle || 0) * Math.PI / 180;
+      const axes = [
+        rotatePoint({ x: -rect.w / 2, y: -rect.h / 2 }, angle),
+        rotatePoint({ x: rect.w / 2, y: -rect.h / 2 }, angle),
+        rotatePoint({ x: rect.w / 2, y: rect.h / 2 }, angle),
+        rotatePoint({ x: -rect.w / 2, y: rect.h / 2 }, angle)
+      ];
+      return axes.map(p => ({ x: rect.cx + p.x, y: rect.cy + p.y }));
+    }
+
+    function rectInsideTriangle(rect, tri, margin) {
+      const corners = rotatedRectCorners(rect);
+      return corners.every(p => pointInTriangle(p, tri, margin));
+    }
+
+    function circleRectOverlap(cell, r, rect, clearance) {
+      const angle = -(rect.angle || 0) * Math.PI / 180;
+      const local = rotatePoint({ x: cell.x - rect.cx, y: cell.y - rect.cy }, angle);
+      const dx = Math.max(Math.abs(local.x) - rect.w / 2, 0);
+      const dy = Math.max(Math.abs(local.y) - rect.h / 2, 0);
+      return Math.hypot(dx, dy) < r + clearance;
+    }
+
+    function controllerCornerFit(rect, tri) {
+      const corners = rotatedRectCorners(rect);
+      let best = { distance: Infinity, vertexIndex: 0 };
+      tri.forEach((vertex, vertexIndex) => {
+        corners.forEach(corner => {
+          const distance = Math.hypot(corner.x - vertex.x, corner.y - vertex.y);
+          if (distance < best.distance) best = { distance, vertexIndex };
+        });
+      });
+      return best;
+    }
+
+    function findController(tri, cells, opts) {
+      if (!opts.controllerOn) return { rect: null, cells };
+
+      let currentW = opts.controllerW;
+      let currentH = opts.controllerH;
+      if (opts.controllerRotate) {
+        currentW = Math.max(opts.controllerW, opts.controllerH);
+        currentH = Math.min(opts.controllerW, opts.controllerH);
+      }
+
+      const bounds = polygonBounds(tri);
+      const radius = opts.cellDiameter / 2;
+      const posStep = Math.max(14, Math.min(currentW, currentH, opts.cellDiameter) * 2.2);
+      let best = null;
+
+      function tryRect(rect) {
+        if (!rectInsideTriangle(rect, tri, opts.frameMargin)) return;
+        const kept = [];
+        let removed = 0;
+        for (const cell of cells) {
+          if (circleRectOverlap(cell, radius, rect, opts.cellGap + 1)) removed++;
+          else kept.push(cell);
+        }
+        const center = { x: rect.cx, y: rect.cy };
+        const cornerFit = controllerCornerFit(rect, tri);
+        const sideScore = -Math.min(
+          edgeDistance(center, tri[0], tri[1]),
+          edgeDistance(center, tri[1], tri[2]),
+          edgeDistance(center, tri[2], tri[0])
+        );
+        const touchScore = cells.reduce((sum, c) => {
+          const near = circleRectOverlap(c, radius + 12, rect, opts.cellGap + 10) ? 1 : 0;
+          return sum + near;
+        }, 0);
+        const score = -cornerFit.distance * 100000 + kept.length * 1000 + touchScore * 20 + sideScore - removed * 7;
+        if (!best || score > best.score) {
+          best = {
+            rect: { ...rect, cornerDistance: cornerFit.distance, cornerIndex: cornerFit.vertexIndex },
+            cells: kept,
+            score,
+            removed
+          };
+        }
+      }
+
+      // Wyznaczenie kątów krawędzi trójkąta dla dopasowania równoległego
+      const uniqueAngles = [];
+      if (opts.controllerRotate) {
+        const n = tri.length;
+        for (let i = 0; i < n; i++) {
+          const p1 = tri[i];
+          const p2 = tri[(i + 1) % n];
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const angleRad = Math.atan2(dy, dx);
+          const angleDeg = (angleRad * 180 / Math.PI);
+          // Normalizacja do przedziału [0, 180)
+          const a1 = ((angleDeg % 180) + 180) % 180;
+
+          if (!uniqueAngles.some(x => Math.abs(x - a1) < 0.01)) {
+            uniqueAngles.push(Math.round(a1 * 100) / 100);
+          }
+        }
+      } else {
+        uniqueAngles.push(0);
+      }
+      uniqueAngles.sort((a, b) => a - b);
+
+      // Wyszukiwanie zgrubne (coarse)
+      for (const angle of uniqueAngles) {
+        for (let cy = bounds.minY; cy <= bounds.maxY; cy += posStep) {
+          for (let cx = bounds.minX; cx <= bounds.maxX; cx += posStep) {
+            tryRect({ cx, cy, w: currentW, h: currentH, angle });
+          }
+        }
+      }
+
+      // Wyszukiwanie dokładne (fine) wokół najlepszej pozycji (dla wybranego kąta)
+      if (best) {
+        const fineStep = Math.max(1, posStep / 12);
+        const angle = best.rect.angle;
+        for (let cy = best.rect.cy - posStep; cy <= best.rect.cy + posStep; cy += fineStep) {
+          for (let cx = best.rect.cx - posStep; cx <= best.rect.cx + posStep; cx += fineStep) {
+            tryRect({ cx, cy, w: currentW, h: currentH, angle });
+          }
+        }
+      }
+      return best || { rect: null, cells: [], warning: "Nie znaleziono miejsca na sterownik przy tych wymiarach i marginesach." };
+    }
+
+    function weldingOrder(cells) {
+      if (!cells.length) return [];
+      if (cells.every(cell => Number.isFinite(cell.row) && Number.isFinite(cell.col))) {
+        const rowsByIndex = new Map();
+        cells.forEach(cell => {
+          if (!rowsByIndex.has(cell.row)) rowsByIndex.set(cell.row, []);
+          rowsByIndex.get(cell.row).push(cell);
+        });
+        return [...rowsByIndex.entries()]
+          .sort(([a], [b]) => a - b)
+          .flatMap(([rowIndex, rowCells], visualRowIndex) => {
+            const ordered = [...rowCells].sort((a, b) => a.col - b.col);
+            return visualRowIndex % 2 === 0 ? ordered : ordered.reverse();
+          });
+      }
+      const pitch = readNumber("cellType") + readNumber("cellGap");
+      const rowTolerance = Math.max(4, pitch * 0.45);
+      const rows = [];
+
+      [...cells].sort((a, b) => a.y - b.y || a.x - b.x).forEach(cell => {
+        let row = rows.find(r => Math.abs(r.avgY - cell.y) <= rowTolerance);
+        if (!row) {
+          row = { avgY: cell.y, cells: [] };
+          rows.push(row);
+        }
+        row.cells.push(cell);
+        row.avgY = row.cells.reduce((sum, c) => sum + c.y, 0) / row.cells.length;
+      });
+
+      rows.sort((a, b) => a.avgY - b.avgY);
+      return rows.flatMap((row, rowIndex) => {
+        const ordered = [...row.cells].sort((a, b) => a.x - b.x);
+        return rowIndex % 2 === 0 ? ordered : ordered.reverse();
+      });
+    }
+
+    function verticalSnakePath(cells) {
+      if (!cells.length) return [];
+      const pitch = readNumber("cellType") + readNumber("cellGap");
+      const colTolerance = Math.max(4, pitch * 0.45);
+      const cols = [];
+
+      // Group cells into columns by horizontal coordinate
+      [...cells].sort((a, b) => a.x - b.x || a.y - b.y).forEach(cell => {
+        let col = cols.find(c => Math.abs(c.avgX - cell.x) <= colTolerance);
+        if (!col) {
+          col = { avgX: cell.x, cells: [] };
+          cols.push(col);
+        }
+        col.cells.push(cell);
+        col.avgX = col.cells.reduce((sum, c) => sum + c.x, 0) / col.cells.length;
+      });
+
+      // Sort columns left-to-right
+      cols.sort((a, b) => a.avgX - b.avgX);
+
+      // Map columns: 0-th column (down), 1-st (up), 2-nd (down)...
+      return cols.flatMap((col, colIndex) => {
+        const ordered = [...col.cells].sort((a, b) => a.y - b.y);
+        return colIndex % 2 === 0 ? ordered : ordered.reverse();
+      });
+    }
+
+    function assignSections(cells, series) {
+      if (!cells.length) return [];
+      const parallel = Math.floor(cells.length / series);
+      if (parallel === 0) return cells.map(cell => ({ ...cell, section: null, parallelIndex: null }));
+
+      const pitch = readNumber("cellType") + readNumber("cellGap");
+
+      // 1. Wydzielenie zapasowych ogniw na prawym końcu ramy (jak najdalej od środka, przy rogu)
+      let numSpares = cells.length - series * parallel;
+      const spares = [];
+      const activeCells = [...cells];
+
+      if (numSpares > 0) {
+        // Zawsze szukamy najdalej wysuniętego punktu na prawo (tylny róg ramy)
+        let rightmost = activeCells[0];
+        for (const c of activeCells) {
+          if (c.x > rightmost.x) rightmost = c;
+        }
+
+        // Sortujemy ogniwa według odległości od prawego rogu
+        activeCells.sort((a, b) => {
+          const da = Math.hypot(a.x - rightmost.x, a.y - rightmost.y);
+          const db = Math.hypot(b.x - rightmost.x, b.y - rightmost.y);
+          return da - db;
+        });
+
+        // Zdejmujemy ogniwa zapasowe z rogu ramy (są one odrzucane z przypisywania do sekcji)
+        for (let i = 0; i < numSpares; i++) {
+          spares.push(activeCells.shift());
+        }
+      }
+
+      // Teraz mamy DOKŁADNIE series * parallel ogniw do przypisania.
+      const sections = [];
+      let unvisited = [];
+
+      if (activeVariantTab === 1) {
+        const ordered = verticalSnakePath(activeCells);
+        for (let s = 0; s < series; s++) {
+          const sectionCells = [];
+          for (let p = 0; p < parallel; p++) {
+            const idx = s * parallel + p;
+            if (idx < ordered.length) {
+              sectionCells.push(ordered[idx]);
+            }
+          }
+          sections.push(sectionCells);
+        }
+      } else {
+        unvisited = [...activeCells];
+
+        // Funkcja pomocnicza: ile niezajętych sąsiadów ma dane ogniwo
+        function getDegree(cell) {
+          let deg = 0;
+          for (const c of unvisited) {
+            if (c !== cell && Math.hypot(c.x - cell.x, c.y - cell.y) <= pitch * 1.35) {
+              deg++;
+            }
+          }
+          return deg;
+        }
+
+      // 2. Budowanie w 100% połączonych sekcji (Min-Degree Region Growing)
+      for (let s = 0; s < series; s++) {
+        if (unvisited.length === 0) break;
+        const sectionCells = [];
+        let seedIndex = 0;
+
+        if (s === 0) {
+          // Pierwsza sekcja rusza od absolutnie najdalej wysuniętego na lewo ogniwa
+          let minX = Infinity;
+          for (let i = 0; i < unvisited.length; i++) {
+            if (unvisited[i].x < minX) {
+              minX = unvisited[i].x;
+              seedIndex = i;
+            }
+          }
+        } else {
+          // Dla kolejnych sekcji znajdujemy sąsiadów poprzedniej sekcji
+          const prevSection = sections[s - 1];
+          const candidates = [];
+
+          for (let i = 0; i < unvisited.length; i++) {
+            const u = unvisited[i];
+            let isNeighbor = false;
+            for (const p of prevSection) {
+              if (Math.hypot(u.x - p.x, u.y - p.y) <= pitch * 1.35) {
+                isNeighbor = true;
+                break;
+              }
+            }
+            if (isNeighbor) candidates.push({ idx: i, cell: u });
+          }
+
+          if (candidates.length > 0) {
+            // Wybieramy sąsiada, który jest najbardziej zaklinowany (min-degree),
+            // aby nie zostawiać niepołączonych ślepych zaułków! W przypadku remisu bierzemy najbardziej lewy.
+            let minDeg = Infinity;
+            let bestCand = null;
+            for (const cand of candidates) {
+              const deg = getDegree(cand.cell);
+              if (deg < minDeg || (deg === minDeg && (!bestCand || cand.cell.x < bestCand.cell.x))) {
+                minDeg = deg;
+                bestCand = cand;
+              }
+            }
+            seedIndex = bestCand.idx;
+          } else {
+            // Backup, jeśli jakimś cudem nie ma sąsiadów - bierzemy najbliższe z lewej
+            let minX = Infinity;
+            for (let i = 0; i < unvisited.length; i++) {
+              if (unvisited[i].x < minX) {
+                minX = unvisited[i].x;
+                seedIndex = i;
+              }
+            }
+          }
+        }
+
+        sectionCells.push(unvisited.splice(seedIndex, 1)[0]);
+
+        // Zapełnianie sekcji do limitu P
+        while (sectionCells.length < parallel && unvisited.length > 0) {
+          const candidates = [];
+          let cx = 0, cy = 0;
+          for (const sc of sectionCells) {
+            cx += sc.x; cy += sc.y;
+          }
+          cx /= sectionCells.length;
+          cy /= sectionCells.length;
+
+          for (let i = 0; i < unvisited.length; i++) {
+            const u = unvisited[i];
+            let isNeighbor = false;
+            for (const sc of sectionCells) {
+              if (Math.hypot(u.x - sc.x, u.y - sc.y) <= pitch * 1.35) {
+                isNeighbor = true;
+                break;
+              }
+            }
+            if (isNeighbor) candidates.push({ idx: i, cell: u });
+          }
+
+          let bestIdx = -1;
+          if (candidates.length > 0) {
+            let bestScore = Infinity;
+            for (const cand of candidates) {
+              const deg = getDegree(cand.cell);
+              const distToCentroid = Math.hypot(cand.cell.x - cx, cand.cell.y - cy);
+              // Waga priorytetów: najpierw zatykamy ślepe zaułki (1000 * deg), potem zwartość fizyczna
+              const score = deg * 1000 + distToCentroid;
+              if (score < bestScore) {
+                bestScore = score;
+                bestIdx = cand.idx;
+              }
+            }
+          } else {
+            // Sekcja zablokowana (np. brak przejścia) - skok do fizycznie najbliższego ogniwa
+            let bestScore = Infinity;
+            for (let i = 0; i < unvisited.length; i++) {
+              const distToCentroid = Math.hypot(unvisited[i].x - cx, unvisited[i].y - cy);
+              if (distToCentroid < bestScore) {
+                bestScore = distToCentroid;
+                bestIdx = i;
+              }
+            }
+          }
+
+          sectionCells.push(unvisited.splice(bestIdx, 1)[0]);
+        }
+
+        sections.push(sectionCells);
+      }
+
+      // 5. System korekt (Pairwise Exchange) by wygładzić granice i usunąć wystające ogniwa
+      function isContiguous(secCells) {
+        if (secCells.length <= 1) return true;
+        const visited = new Set();
+        const queue = [secCells[0]];
+        visited.add(secCells[0].id);
+        let count = 1;
+        while (queue.length > 0) {
+          const curr = queue.shift();
+          for (const other of secCells) {
+            if (!visited.has(other.id)) {
+              if (Math.hypot(curr.x - other.x, curr.y - other.y) <= pitch * 1.35) {
+                visited.add(other.id);
+                queue.push(other);
+                count++;
+              }
+            }
+          }
+        }
+        return count === secCells.length;
+      }
+
+      let changed = true;
+      let iters = 0;
+      while (changed && iters < 50) {
+        changed = false;
+        iters++;
+
+        const centroids = [];
+        for (let s = 0; s < series; s++) {
+          const secCells = sections[s];
+          let cx = 0, cy = 0;
+          for (const sc of secCells) {
+            cx += sc.x; cy += sc.y;
+          }
+          centroids[s] = { x: cx / secCells.length, y: cy / secCells.length };
+        }
+
+        // Pomocnicze funkcje do wykrywania wąskich gardeł (1-połączeniowych)
+        const getBoundaryEdges = (idx1, idx2) => {
+          if (idx1 < 0 || idx2 < 0 || idx1 >= series || idx2 >= series) return 0;
+          let count = 0;
+          for (const c1 of sections[idx1]) {
+            for (const c2 of sections[idx2]) {
+              if (Math.hypot(c1.x - c2.x, c1.y - c2.y) <= pitch * 1.35) count++;
+            }
+          }
+          return count;
+        };
+
+        const getBottleneckPenalty = (s1_idx, s2_idx) => {
+          const boundaries = new Set();
+          if (s1_idx > 0) boundaries.add(s1_idx - 1);
+          if (s1_idx < series - 1) boundaries.add(s1_idx);
+          if (s2_idx > 0) boundaries.add(s2_idx - 1);
+          if (s2_idx < series - 1) boundaries.add(s2_idx);
+
+          let penalty = 0;
+          for (const b of boundaries) {
+            const edges = getBoundaryEdges(b, b + 1);
+            if (edges === 0) {
+              penalty += pitch * pitch * 10000; // Krytyczna kara za całkowity brak połączenia (przerwany obwód!)
+            } else if (edges === 1) {
+              penalty += pitch * pitch * 200; // Duża kara za wąskie gardło
+            }
+          }
+          return penalty;
+        };
+
+        for (let s1 = 0; s1 < series; s1++) {
+          for (let s2 = s1 + 1; s2 < series; s2++) {
+            for (let i = 0; i < sections[s1].length; i++) {
+              for (let j = 0; j < sections[s2].length; j++) {
+                const c1 = sections[s1][i];
+                const c2 = sections[s2][j];
+
+                // Optymalizacja: badamy zamianę tylko fizycznie bliskich ogniw
+                if (Math.hypot(c1.x - c2.x, c1.y - c2.y) > pitch * 5) continue;
+
+                // Używamy wag: odchylenia poziome (X) są karane 4x bardziej niż pionowe
+                const dx1_old = c1.x - centroids[s1].x;
+                const dy1_old = c1.y - centroids[s1].y;
+                const cost1_old = 4 * (dx1_old * dx1_old) + (dy1_old * dy1_old);
+
+                const dx2_old = c2.x - centroids[s2].x;
+                const dy2_old = c2.y - centroids[s2].y;
+                const cost2_old = 4 * (dx2_old * dx2_old) + (dy2_old * dy2_old);
+
+                // --- Symulacja połączeń niklowych i Hot-Pointów ---
+                const weightSlider = sectionVariantSettings.edgeWeight; // Wartość 0-10
+                const edgeWeight = pitch * pitch * weightSlider;
+
+                const countE = (cell, sIdx) => {
+                  let conns = 0;
+                  const check = (idx) => {
+                    if (idx >= 0 && idx < series) {
+                      for (const other of sections[idx]) {
+                        if (Math.hypot(cell.x - other.x, cell.y - other.y) <= pitch * 1.35) conns++;
+                      }
+                    }
+                  }
+                  check(sIdx - 1);
+                  check(sIdx + 1);
+                  return conns;
+                };
+
+                const edgesBefore = countE(c1, s1) + countE(c2, s2);
+                const penaltyBefore = getBottleneckPenalty(s1, s2);
+                const oldCost = cost1_old + cost2_old - (edgesBefore * edgeWeight) + penaltyBefore;
+
+                const dx1_new = c1.x - centroids[s2].x;
+                const dy1_new = c1.y - centroids[s2].y;
+                const cost1_new = 4 * (dx1_new * dx1_new) + (dy1_new * dy1_new);
+
+                const dx2_new = c2.x - centroids[s1].x;
+                const dy2_new = c2.y - centroids[s1].y;
+                const cost2_new = 4 * (dx2_new * dx2_new) + (dy2_new * dy2_new);
+
+                // Tymczasowa zamiana dla oceny wirtualnych krawędzi i spójności
+                sections[s1][i] = c2;
+                sections[s2][j] = c1;
+
+                const edgesAfter = countE(c2, s1) + countE(c1, s2);
+                const penaltyAfter = getBottleneckPenalty(s1, s2);
+                const newCost = cost1_new + cost2_new - (edgesAfter * edgeWeight) + penaltyAfter;
+
+                if (newCost < oldCost - 0.1) {
+                  // Sprawdzamy czy sekcje pozostały spójne
+                  if (isContiguous(sections[s1]) && isContiguous(sections[s2])) {
+                    changed = true;
+                    centroids[s1].x += (c2.x - c1.x) / parallel;
+                    centroids[s1].y += (c2.y - c1.y) / parallel;
+                    centroids[s2].x += (c1.x - c2.x) / parallel;
+                    centroids[s2].y += (c1.y - c2.y) / parallel;
+                  } else {
+                    // Cofamy jeśli rozerwało
+                    sections[s1][i] = c1;
+                    sections[s2][j] = c2;
+                  }
+                } else {
+                  // Cofamy jeśli koszt się nie poprawił (brak zysku z połączeń / zwartości)
+                  sections[s1][i] = c1;
+                  sections[s2][j] = c2;
+                }
+              } // j
+            } // i
+          } // s2
+        } // s1
+      } // while
+
+      // Naprawa spójności: wykryj i napraw rozrzucone (odłączone) ogniwa
+      function getLargestComponent(sectionCells) {
+        if (sectionCells.length <= 1) return new Set(sectionCells.map(c => c.id));
+        let best = new Set();
+        for (const start of sectionCells) {
+          const visited = new Set([start.id]);
+          const queue = [start];
+          while (queue.length > 0) {
+            const curr = queue.shift();
+            for (const other of sectionCells) {
+              if (!visited.has(other.id) && Math.hypot(curr.x - other.x, curr.y - other.y) <= pitch * 1.35) {
+                visited.add(other.id);
+                queue.push(other);
+              }
+            }
+          }
+          if (visited.size > best.size) best = visited;
+          if (visited.size === sectionCells.length) break; // już spójna
+        }
+        return best;
+      }
+
+      function isContiguousArr(arr) {
+        if (arr.length <= 1) return true;
+        const visited = new Set([arr[0].id]);
+        const queue = [arr[0]];
+        while (queue.length > 0) {
+          const curr = queue.shift();
+          for (const other of arr) {
+            if (!visited.has(other.id) && Math.hypot(curr.x - other.x, curr.y - other.y) <= pitch * 1.35) {
+              visited.add(other.id);
+              queue.push(other);
+            }
+          }
+        }
+        return visited.size === arr.length;
+      }
+
+      let repairChanged = true;
+      let repairPasses = 0;
+      while (repairChanged && repairPasses < 40) {
+        repairChanged = false;
+        repairPasses++;
+
+        for (let si = 0; si < sections.length; si++) {
+          const main = getLargestComponent(sections[si]);
+          const strays = sections[si].filter(c => !main.has(c.id));
+          if (strays.length === 0) continue;
+
+          for (const stray of strays) {
+            let moved = false;
+
+            // Spróbuj zamienić stray (z si) z sąsiadującym ogniwem z innej sekcji
+            for (let sj = 0; sj < sections.length && !moved; sj++) {
+              if (sj === si) continue;
+
+              // Posortuj kandydatów w sj wg bliskości do stray
+              const candidates = sections[sj]
+                .map(c => ({ c, d: Math.hypot(c.x - stray.x, c.y - stray.y) }))
+                .filter(({ d }) => d <= pitch * 1.35)
+                .sort((a, b) => a.d - b.d);
+
+              for (const { c: neighbor } of candidates) {
+                const newSi = [...sections[si].filter(c => c.id !== stray.id), neighbor];
+                const newSj = [...sections[sj].filter(c => c.id !== neighbor.id), stray];
+
+                if (isContiguousArr(newSi) && isContiguousArr(newSj)) {
+                  sections[si] = newSi;
+                  sections[sj] = newSj;
+                  repairChanged = true;
+                  moved = true;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Drugi skan po agresywnym zazębianiu: jeśli sekcja ma wyspę,
+      // szukamy ogniwa z innej sekcji przy głównym komponencie i zamieniamy je z wyspą.
+      repairChanged = true;
+      repairPasses = 0;
+      while (repairChanged && repairPasses < 60) {
+        repairChanged = false;
+        repairPasses++;
+
+        for (let si = 0; si < sections.length; si++) {
+          const main = getLargestComponent(sections[si]);
+          if (main.size === sections[si].length) continue;
+
+          const mainCells = sections[si].filter(c => main.has(c.id));
+          const strays = sections[si].filter(c => !main.has(c.id))
+            .sort((a, b) => {
+              const da = Math.min(...mainCells.map(c => Math.hypot(a.x - c.x, a.y - c.y)));
+              const db = Math.min(...mainCells.map(c => Math.hypot(b.x - c.x, b.y - c.y)));
+              return db - da;
+            });
+
+          for (const stray of strays) {
+            let fixed = false;
+            const candidates = [];
+
+            for (let sj = 0; sj < sections.length; sj++) {
+              if (sj === si) continue;
+              for (const candidate of sections[sj]) {
+                const distToMain = Math.min(...mainCells.map(c => Math.hypot(candidate.x - c.x, candidate.y - c.y)));
+                const distToStray = Math.hypot(candidate.x - stray.x, candidate.y - stray.y);
+                if (distToMain <= pitch * 1.35) {
+                  candidates.push({sj, candidate, score: distToMain + distToStray * 0.25});
+                }
+              }
+            }
+
+            candidates.sort((a, b) => a.score - b.score);
+            for (const {sj, candidate} of candidates) {
+              const newSi = [...sections[si].filter(c => c.id !== stray.id), candidate];
+              const newSj = [...sections[sj].filter(c => c.id !== candidate.id), stray];
+              if (isContiguousArr(newSi) && isContiguousArr(newSj)) {
+                sections[si] = newSi;
+                sections[sj] = newSj;
+                repairChanged = true;
+                fixed = true;
+                break;
+              }
+            }
+
+            if (fixed) break;
+          }
+        }
+      }
+
+      // Wyrównanie liczby ogniw po naprawie (zabezpieczenie dla skrajnych przypadków)
+      for (let safety = 0; safety < parallel * series; safety++) {
+        const shortIdx = sections.findIndex(sec => sec.length < parallel);
+        if (shortIdx === -1) break;
+        const longIdx = sections.findIndex(sec => sec.length > parallel);
+        if (longIdx !== -1) {
+          sections[shortIdx].push(sections[longIdx].pop());
+        } else if (unvisited.length > 0) {
+          sections[shortIdx].push(unvisited.shift());
+        } else break;
+      }
+      unvisited.length = 0;
+    }
+
+    const finalCells = [];
+      const unassigned = unvisited.map(c => ({ ...c, section: null, parallelIndex: null }));
+
+      for (let s = 0; s < sections.length; s++) {
+        const sec = sections[s];
+        sec.sort((a, b) => a.x - b.x || a.y - b.y);
+        sec.forEach((c, idx) => {
+          finalCells.push({ ...c, section: s, parallelIndex: idx + 1 });
+        });
+      }
+
+      unassigned.forEach(c => finalCells.push(c));
+      spares.forEach(c => finalCells.push({ ...c, section: null, parallelIndex: null }));
+      return finalCells;
+    }
+
+    function possibleConfigs(totalCells) {
+      const out = [];
+      for (let s = 1; s <= Math.min(24, totalCells); s++) {
+        if (totalCells % s === 0) out.push({ s, p: totalCells / s });
+      }
+      return out.filter(x => x.p >= 1).sort((a, b) => {
+        const pref = [10, 13, 14, 16, 20].indexOf(a.s) - [10, 13, 14, 16, 20].indexOf(b.s);
+        if ([10, 13, 14, 16, 20].includes(a.s) && [10, 13, 14, 16, 20].includes(b.s)) return pref;
+        if ([10, 13, 14, 16, 20].includes(a.s)) return -1;
+        if ([10, 13, 14, 16, 20].includes(b.s)) return 1;
+        return b.s - a.s;
+      }).slice(0, 12);
+    }
+
+    function delayFrame() {
+      return new Promise(resolve => requestAnimationFrame(resolve));
+    }
+
+    function setProgress(percent, text) {
+      $("progressBar").style.width = `${Math.max(0, Math.min(100, percent)).toFixed(1)}%`;
+      if (text) $("status").textContent = text;
+    }
+
+    function previewVariant(variant) {
+      variants = [variant];
+      activeIndex = 0;
+      render();
+    }
+
+    async function solve(progress = () => { }, runId = solveRunId) {
+      const opts = {
+        cellDiameter: readNumber("cellType"),
+        cellGap: readNumber("cellGap"),
+        frameMargin: readNumber("frameMargin"),
+        angleStep: Math.max(1, readNumber("angleStep")),
+        offsetDensity: Number($("offsetDensity").value),
+        controllerOn: $("controllerOn").checked,
+        controllerW: readNumber("controllerW"),
+        controllerH: readNumber("controllerH"),
+        controllerRotate: $("controllerRotate").checked
+      };
+      const layoutPref = $("layoutMode").value;
+      const layouts = layoutPref === "both" ? ["honeycomb", "square"] : [layoutPref];
+      const triInfo = triangleFromSides([readNumber("sideA"), readNumber("sideB"), readNumber("sideC")]);
+      const pitch = opts.cellDiameter + opts.cellGap;
+      const rawVariants = [];
+      const results = [];
+      const totalAngles = layouts.reduce((sum, layout) => sum + Math.ceil(180 / opts.angleStep), 0);
+      let anglePass = 0;
+      let bestRaw = null;
+
+      for (const layout of layouts) {
+        const rowStep = layout === "honeycomb" ? pitch * Math.sqrt(3) / 2 : pitch;
+        const oxStep = pitch / opts.offsetDensity;
+        const oyStep = rowStep / opts.offsetDensity;
+        for (let angle = 0; angle < 180; angle += opts.angleStep) {
+          if (runId !== solveRunId) return [];
+          for (let ox = 0; ox < pitch - 0.001; ox += oxStep) {
+            for (let oy = 0; oy < rowStep - 0.001; oy += oyStep) {
+              const rawCells = generateGrid(triInfo.points, opts, layout, angle, ox, oy);
+              if (!rawCells.length) continue;
+              const compactness = compactnessScore(rawCells);
+              rawVariants.push({
+                triInfo,
+                layout,
+                angle,
+                ox,
+                oy,
+                rawCells,
+                rawCount: rawCells.length,
+                rawScore: rawCells.length * 100000 + compactness
+              });
+              if (!bestRaw || rawCells.length > bestRaw.rawCells.length || (rawCells.length === bestRaw.rawCells.length && compactness > compactnessScore(bestRaw.rawCells))) {
+                bestRaw = rawVariants[rawVariants.length - 1];
+              }
+            }
+          }
+          anglePass++;
+          progress(
+            anglePass / Math.max(1, totalAngles) * 58,
+            `Etap 1/2: układ ogniw ${anglePass}/${totalAngles}. Najlepszy podgląd: ${bestRaw?.rawCells.length || 0} ogniw.`
+          );
+          if (bestRaw && anglePass % 4 === 0) {
+            previewVariant({
+              triInfo: bestRaw.triInfo,
+              layout: bestRaw.layout,
+              angle: bestRaw.angle,
+              ox: bestRaw.ox,
+              oy: bestRaw.oy,
+              cells: bestRaw.rawCells,
+              rawCount: bestRaw.rawCount,
+              controller: null,
+              removedByController: 0,
+              score: bestRaw.rawScore
+            });
+          }
+          await delayFrame();
+        }
+      }
+
+      rawVariants.sort((a, b) => b.rawScore - a.rawScore);
+      const maxRaw = rawVariants[0]?.rawCount || 0;
+      const controllerSearchPool = opts.controllerOn
+        ? rawVariants.filter(v => v.rawCount >= maxRaw - 12).slice(0, 18)
+        : rawVariants;
+
+      for (let i = 0; i < controllerSearchPool.length; i++) {
+        if (runId !== solveRunId) return [];
+        const variant = controllerSearchPool[i];
+        const controller = findController(triInfo.points, variant.rawCells, opts);
+        if (opts.controllerOn && !controller.rect) continue;
+        const cells = controller.cells;
+        const compactness = compactnessScore(cells);
+        results.push({
+          triInfo: variant.triInfo,
+          layout: variant.layout,
+          angle: variant.angle,
+          ox: variant.ox,
+          oy: variant.oy,
+          cells,
+          rawCount: variant.rawCount,
+          controller: controller.rect,
+          removedByController: controller.removed || 0,
+          score: opts.controllerOn && controller.rect
+            ? -controller.rect.cornerDistance * 100000 + cells.length * 1000 + compactness
+            : cells.length * 100000 + compactness
+        });
+        results.sort((a, b) => b.score - a.score || b.cells.length - a.cells.length);
+        if (results[0]) previewVariant(results[0]);
+        progress(
+          58 + ((i + 1) / Math.max(1, controllerSearchPool.length)) * 40,
+          opts.controllerOn
+            ? `Etap 2/2: sterownik przy rogu ${i + 1}/${controllerSearchPool.length}. Najlepszy wynik: ${results[0]?.cells.length || 0} ogniw.`
+            : `Porządkowanie wyników ${i + 1}/${controllerSearchPool.length}.`
+        );
+        await delayFrame();
+      }
+
+      results.sort((a, b) => b.score - a.score || b.cells.length - a.cells.length);
+      // Zwracamy tylko 1 najlepszy wynik – warianty wyglądu obsługiwane są przez zakładki poniżej
+      return results.slice(0, 1);
+    }
+
+    function compactnessScore(cells) {
+      if (!cells.length) return 0;
+      const cx = cells.reduce((s, c) => s + c.x, 0) / cells.length;
+      const cy = cells.reduce((s, c) => s + c.y, 0) / cells.length;
+      const spread = cells.reduce((s, c) => s + Math.hypot(c.x - cx, c.y - cy), 0) / cells.length;
+      return -spread;
+    }
+
+    function selectedSeries() {
+      const v = $("seriesSelect").value;
+      return v === "custom" ? Math.max(1, Math.round(readNumber("customS"))) : Number(v);
+    }
+
+    function packStats(series, totalCells) {
+      const parallel = Math.floor(totalCells / series);
+      const usedCells = parallel * series;
+      const cellAh = Math.max(0, readNumber("cellAh"));
+      const cellCurrent = Math.max(0, readNumber("cellCurrent"));
+      const cellVoltage = Math.max(0, readNumber("cellVoltage"));
+      const capacityAh = parallel * cellAh;
+      const currentA = parallel * cellCurrent;
+      const voltageV = series * cellVoltage;
+      const energyWh = voltageV * capacityAh;
+      return { parallel, usedCells, capacityAh, currentA, voltageV, energyWh };
+    }
+
+    function formatNumber(value, decimals = 1) {
+      if (!Number.isFinite(value)) return "0";
+      return value.toFixed(decimals).replace(/\.0$/, "");
+    }
+
+    function render(options = {}) {
+      const {refreshVariants = true} = options;
+      // Pomocnicza – pierwszy niekompletny cel (sekcja) ze wszystkich wcześniejszych od activeDrawSec
+      function findFirstIncompleteSec() {
+        for (let s = 0; s <= activeDrawSec; s++) {
+          const count = manualVariant ? manualVariant.cells.filter(c => c.section === s).length : 0;
+          if (count < manualP) return s;
+        }
+        return null;
+      }
+      const svg = $("drawing");
+      const variant = manualMode ? manualVariant : variants[activeIndex];
+      if (!variant) {
+        svg.innerHTML = "";
+        return;
+      }
+      const series = manualMode ? manualS : selectedSeries();
+      const cells = manualMode ? manualVariant.cells : assignSections(variant.cells, series);
+      const tri = variant.triInfo.points;
+      const bounds = polygonBounds(tri);
+      const pad = 40;
+      const minX = bounds.minX - pad;
+      const minY = bounds.minY - pad;
+      const width = bounds.maxX - bounds.minX + pad * 2;
+      const height = bounds.maxY - bounds.minY + pad * 2;
+      const r = readNumber("cellType") / 2;
+      svg.setAttribute("viewBox", `${minX} ${minY} ${width} ${height}`);
+
+      const poly = tri.map(p => `${p.x},${p.y}`).join(" ");
+      const labels = sideLabels(variant.triInfo);
+      // Zastosowanie ręcznych zamian sekcji (cellOverrides)
+      const overriddenCells = cells.map(c => ({ ...c }));
+      if (!manualMode) {
+        for (const c of overriddenCells) {
+          if (cellOverrides[c.id] !== undefined) {
+            c.section = cellOverrides[c.id];
+            if (c.section === null) {
+              c.parallelIndex = null;
+            }
+          }
+        }
+      }
+      // Przelicz parallelIndex po nadpisaniach
+      const secGroups = {};
+      for (const c of overriddenCells) {
+        if (c.section !== null) {
+          if (!secGroups[c.section]) secGroups[c.section] = [];
+          secGroups[c.section].push(c);
+        }
+      }
+      for (const s of Object.keys(secGroups)) {
+        secGroups[s].sort((a, b) => a.x - b.x || a.y - b.y);
+        secGroups[s].forEach((c, i) => { c.parallelIndex = i + 1; });
+      }
+
+      let selectedCellSvg = "";
+      const cellSvg = overriddenCells.map(c => {
+        const fill = c.section === null ? "#d8dee8" : colors[c.section % colors.length];
+        const text = c.section === null || c.parallelIndex === null ? "" : c.parallelIndex;
+        const textColor = readableTextColor(fill);
+        const isSelected = c.id === selectedCellId;
+        const ring = isSelected ? `<circle cx="${c.x.toFixed(2)}" cy="${c.y.toFixed(2)}" r="${(r + 2.5).toFixed(2)}" fill="none" stroke="#f59e0b" stroke-width="2.5"></circle>` : "";
+        
+        let textSvg = "";
+        if (c.section !== null && c.parallelIndex !== null) {
+          textSvg = `
+            <text x="${c.x.toFixed(2)}" y="${(c.y - r * 0.08).toFixed(2)}" text-anchor="middle" font-size="${Math.max(4.5, r * .55).toFixed(1)}" font-weight="750" fill="${textColor}" style="pointer-events:none">${text}</text>
+            <text x="${c.x.toFixed(2)}" y="${(c.y + r * 0.48).toFixed(2)}" text-anchor="middle" font-size="${Math.max(3.5, r * .38).toFixed(1)}" font-weight="750" fill="${textColor}" opacity="0.8" style="pointer-events:none">S${c.section + 1}</text>
+          `;
+        }
+        
+        const gContent = `<g class="cell-g" data-cid="${c.id}" data-sec="${c.section}" style="cursor:pointer">${ring}<circle cx="${c.x.toFixed(2)}" cy="${c.y.toFixed(2)}" r="${r.toFixed(2)}" fill="${fill}" stroke="var(--cell-stroke)" stroke-width="0.9"></circle>${textSvg}</g>`;
+        if (isSelected) {
+          selectedCellSvg = gContent;
+          return "";
+        }
+        return gContent;
+      }).join("");
+
+      const controller = variant.controller ? renderController(variant.controller) : "";
+
+      const connectionsSvg = [];
+      const pitch = readNumber("cellType") + readNumber("cellGap");
+
+      // Grupujemy komórki po sekcjach dla szybkiego dostępu (overriddenCells = po ręcznych zamianach)
+      const secs = Array.from({ length: series }, () => []);
+      for (const c of overriddenCells) {
+        if (c.section !== null) secs[c.section].push(c);
+      }
+
+      // Liczymy połączenia seryjne na granicach sekcji, by wykryć wąskie gardła (1-połączeniowe)
+      const boundaryCounts = Array(series - 1).fill(0);
+      for (let s = 0; s < series - 1; s++) {
+        for (const c1 of secs[s]) {
+          for (const c2 of secs[s + 1]) {
+            if (Math.hypot(c1.x - c2.x, c1.y - c2.y) <= pitch * 1.35) {
+              boundaryCounts[s]++;
+            }
+          }
+        }
+      }
+
+      function countComponents(sectionCells) {
+        if (sectionCells.length <= 1) return sectionCells.length;
+        const unseen = new Set(sectionCells.map(c => c.id));
+        let components = 0;
+        while (unseen.size) {
+          components++;
+          const firstId = unseen.values().next().value;
+          const queue = [sectionCells.find(c => c.id === firstId)];
+          unseen.delete(firstId);
+          while (queue.length) {
+            const current = queue.shift();
+            for (const other of sectionCells) {
+              if (unseen.has(other.id) && Math.hypot(current.x - other.x, current.y - other.y) <= pitch * 1.35) {
+                unseen.delete(other.id);
+                queue.push(other);
+              }
+            }
+          }
+        }
+        return components;
+      }
+
+      const splitSections = secs
+        .map((sectionCells, index) => countComponents(sectionCells) > 1 ? `S${index + 1}` : null)
+        .filter(Boolean);
+
+      // Rysujemy strzałki połączeń
+      for (let s = 0; s < series - 1; s++) {
+        const isFront = (s % 2 === 0);
+        const marker = isFront ? "url(#arrow-front)" : "url(#arrow-back)";
+        const stroke = isFront ? "#dc2626" : "#2563eb"; // Czerwone z przodu (plusowa), niebieskie z tyłu (minusowa)
+        const width = "1.5"; // Wyraźniejsza grubość
+        const opacity = isFront ? "0.9" : "0.85"; // Obie znacznie bardziej intensywne
+        const dash = isFront ? "none" : "3,3";
+        const isWarning = boundaryCounts[s] === 1;
+
+        for (const c1 of secs[s]) {
+          for (const c2 of secs[s + 1]) {
+            const d = Math.hypot(c1.x - c2.x, c1.y - c2.y);
+            if (d <= pitch * 1.35) {
+              const ux = (c2.x - c1.x) / d;
+              const uy = (c2.y - c1.y) / d;
+              // Rysujemy od brzegu do brzegu komórki, by grot był widoczny
+              const x1 = c1.x + ux * (r * 1.05);
+              const y1 = c1.y + uy * (r * 1.05);
+              const x2 = c2.x - ux * (r * 1.3);
+              const y2 = c2.y - uy * (r * 1.3);
+
+              connectionsSvg.push(`<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="${stroke}" stroke-width="${width}" stroke-dasharray="${dash}" opacity="${opacity}" marker-end="${marker}"></line>`);
+              
+              if (isWarning) {
+                // Wykrzyknik ostrzegawczy na środku jedynego połączenia
+                const mx = (x1 + x2) / 2;
+                const my = (y1 + y2) / 2;
+                connectionsSvg.push(`
+                  <g transform="translate(${mx.toFixed(1)}, ${my.toFixed(1)})" style="pointer-events:none">
+                    <polygon points="0,-6.5 6.5,4.5 -6.5,4.5" fill="#f59e0b" stroke="#0f172a" stroke-width="0.8"></polygon>
+                    <text x="0" y="2.5" font-size="7" font-weight="900" fill="#0f172a" text-anchor="middle">!</text>
+                  </g>
+                `);
+              }
+            }
+          }
+        }
+      }
+
+      // Ostrzeżenia jako HTML pod canvasem – bez rozciągania SVG
+      const missingConnections = [];
+      for (let s = 0; s < series - 1; s++) {
+        if (boundaryCounts[s] === 0) missingConnections.push(`S${s+1}↔S${s+2}`);
+      }
+      const warnEl = $("connectionWarnings");
+      if (missingConnections.length > 0 || splitSections.length > 0) {
+        warnEl.style.display = "flex";
+        warnEl.innerHTML = `
+          <span style="font-size:13px;font-weight:800;color:#ef4444;">⚠ DO SPRAWDZENIA:</span>
+          ${missingConnections.map(label => `<span style="background:#2d1515;border:1px solid #ef4444;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;color:#fca5a5;">${label}</span>`).join("")}
+          ${splitSections.map(label => `<span style="background:#2d1515;border:1px solid #f59e0b;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;color:#fed7aa;">rozbita ${label}</span>`).join("")}
+        `;
+      } else {
+        warnEl.style.display = "none";
+        warnEl.innerHTML = "";
+      }
+
+      svg.innerHTML = `
+        <defs>
+          <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#111827" flood-opacity=".18"/>
+          </filter>
+          <marker id="arrow-front" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="3.5" markerHeight="3.5" orient="auto">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#dc2626" />
+          </marker>
+          <marker id="arrow-back" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="3.5" markerHeight="3.5" orient="auto">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#2563eb" />
+          </marker>
+        </defs>
+        <polygon points="${poly}" fill="transparent" stroke="var(--frame)" stroke-width="2.5" filter="url(#softShadow)"></polygon>
+        ${controller}
+        ${cellSvg}
+        ${connectionsSvg.join("")}
+        ${selectedCellSvg}
+        ${labels}
+      `;
+
+      // Funkcja pomocnicza do aktualizacji paska stanu w trybie ręcznym
+      const updateManualStatus = () => {
+        if (!manualMode) return;
+        const currentCount = overriddenCells.filter(c => c.section === activeDrawSec).length;
+        const totalAssigned = overriddenCells.filter(c => c.section !== null).length;
+        const totalRequired = manualS * manualP;
+        const pct = Math.min(100, (totalAssigned / totalRequired) * 100);
+
+        $("status").className = "status";
+        $("status").innerHTML = `
+          <strong style="color:var(--accent)">Tryb Ręczny:</strong> Rysowanie celi <strong>S${activeDrawSec + 1}</strong> (${currentCount}/${manualP} ogniw).<br/>
+          <span style="font-size:11px;opacity:0.85">LPM - maluj/zmaż | PPM - zmaż | Kliknij kafelki legendy poniżej, aby przełączyć aktywny cel.</span>
+        `;
+        $("progressBar").style.width = `${pct.toFixed(1)}%`;
+      };
+
+      if (manualMode) {
+        updateManualStatus();
+      }
+
+      // Delegacja kliknięć na ogniwa
+      svg.onclick = (e) => {
+        const g = e.target.closest(".cell-g");
+        if (!g) {
+          if (!manualMode) selectedCellId = null;
+          render();
+          return;
+        }
+        const clickedId = Number(g.dataset.cid);
+
+        if (manualMode) {
+          const cell = manualVariant.cells.find(c => c.id === clickedId);
+          if (cell) {
+            if (cell.section === activeDrawSec) {
+              // LPM na ogniwie tej samej sekcji -> usuwamy je
+              cell.section = null;
+              cell.parallelIndex = null;
+            } else if (cell.section !== null) {
+              // LPM na ogniwie innej (poprzedniej) sekcji -> usuwamy je z tamtej sekcji
+              cell.section = null;
+              cell.parallelIndex = null;
+            } else {
+              // LPM na wolnym (szarym) ogniwie -> przypisujemy do obecnej sekcji
+              const count = manualVariant.cells.filter(c => c.section === activeDrawSec).length;
+              if (count < manualP) {
+                cell.section = activeDrawSec;
+                const newCount = count + 1;
+                if (newCount === manualP) {
+                  // Sekcja pełna – sprawdź czy jest jakaś wcześniejsza z lukami, jeśli nie, przejdź dalej
+                  const firstIncomplete = findFirstIncompleteSec();
+                  if (firstIncomplete !== null) {
+                    activeDrawSec = firstIncomplete;
+                  } else if (activeDrawSec < manualS - 1) {
+                    activeDrawSec++;
+                  }
+                }
+              } else {
+                // Sekcja pełna – sprawdź czy jest jakaś wcześniejsza z lukami
+                const firstIncomplete = findFirstIncompleteSec();
+                if (firstIncomplete !== null) {
+                  activeDrawSec = firstIncomplete;
+                }
+              }
+            }
+
+            // Po każdej akcji sprawdź kompletność i wróć do pierwszej niekompletnej
+            const firstIncomplete = findFirstIncompleteSec();
+            if (firstIncomplete !== null && firstIncomplete < activeDrawSec) {
+              activeDrawSec = firstIncomplete;
+            }
+
+            render();
+          }
+          return;
+        }
+
+        if (selectedCellId === null) {
+          // Pierwsze kliknięcie – zaznaczamy ogniwo
+          selectedCellId = clickedId;
+          render();
+        } else if (selectedCellId === clickedId) {
+          // Kliknięcie na to samo – odznaczamy
+          selectedCellId = null;
+          render();
+        } else {
+          // Drugie kliknięcie – próba zamiany sekcji
+          const cellA = overriddenCells.find(c => c.id === selectedCellId);
+          const cellB = overriddenCells.find(c => c.id === clickedId);
+
+          if (cellA && cellB) {
+            const secA = cellA.section;
+            const secB = cellB.section;
+
+            if (secA === secB) {
+              // Ta sama sekcja – zamiana bez sensu, tylko odznaczamy
+              selectedCellId = null;
+              render();
+              return;
+            }
+
+            // Symulacja zamiany w kopii tablicy
+            const testCells = overriddenCells.map(c => ({ ...c }));
+            testCells.find(c => c.id === cellA.id).section = secB;
+            testCells.find(c => c.id === cellB.id).section = secA;
+
+            const pitchCheck = readNumber("cellType") + readNumber("cellGap");
+
+            function checkContiguous(sectionCells) {
+              if (sectionCells.length <= 1) return true;
+              const visited = new Set();
+              const queue = [sectionCells[0]];
+              visited.add(sectionCells[0].id);
+              let count = 1;
+              while (queue.length > 0) {
+                const curr = queue.shift();
+                for (const other of sectionCells) {
+                  if (!visited.has(other.id) && Math.hypot(curr.x - other.x, curr.y - other.y) <= pitchCheck * 1.35) {
+                    visited.add(other.id);
+                    queue.push(other);
+                    count++;
+                  }
+                }
+              }
+              return count === sectionCells.length;
+            }
+
+            const newSecA = testCells.filter(c => c.section === secA && c.section !== null);
+            const newSecB = testCells.filter(c => c.section === secB && c.section !== null);
+            const isValid = checkContiguous(newSecA) && checkContiguous(newSecB);
+
+            if (isValid) {
+              cellOverrides[cellA.id] = secB;
+              cellOverrides[cellB.id] = secA;
+              selectedCellId = null;
+              render();
+            } else {
+              // Blokada – zamiana rozerwałaby sekcję. Animacja błędu.
+              selectedCellId = null;
+              render();
+              // Flash czerwonego obrysu na świeżo wyrenderowanym SVG
+              const svgEl = $("drawing");
+              const flashA = svgEl.querySelector(`[data-cid="${cellA.id}"] circle`);
+              const flashB = svgEl.querySelector(`[data-cid="${cellB.id}"] circle`);
+              [flashA, flashB].forEach(el => {
+                if (!el) return;
+                el.style.transition = "stroke 0s";
+                el.style.stroke = "#ef4444";
+                el.style.strokeWidth = "3";
+                setTimeout(() => {
+                  el.style.transition = "stroke 0.6s, stroke-width 0.6s";
+                  el.style.stroke = "";
+                  el.style.strokeWidth = "";
+                }, 80);
+              });
+            }
+          } else {
+            selectedCellId = null;
+            render();
+          }
+        }
+      };
+
+      // Obsługa prawego przycisku myszy (PPM) - zmazywanie
+      svg.oncontextmenu = (e) => {
+        if (!manualMode) return;
+        e.preventDefault();
+        const g = e.target.closest(".cell-g");
+        if (!g) return;
+        const clickedId = Number(g.dataset.cid);
+        const cell = manualVariant.cells.find(c => c.id === clickedId);
+        if (cell && cell.section !== null) {
+          cell.section = null;
+          cell.parallelIndex = null;
+          // Sprawdź kompletność i wróć do pierwszej niekompletnej
+          const firstIncomplete = findFirstIncompleteSec();
+          if (firstIncomplete !== null && firstIncomplete <= activeDrawSec) {
+            activeDrawSec = firstIncomplete;
+          }
+          render();
+        }
+      };
+
+      renderSummary(variant, series, cells);
+      if (refreshVariants) renderVariants();
+      renderConfigs(variant.cells.length, series);
+      renderLegend(series);
+    }
+
+    function renderController(rect) {
+      const points = rotatedRectCorners(rect).map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ");
+      const labelAngle = rect.angle || 0;
+      return `
+        <polygon points="${points}" fill="#ffe8b3" stroke="#9a6700" stroke-width="2"></polygon>
+        <text x="${rect.cx.toFixed(2)}" y="${(rect.cy + 4).toFixed(2)}" text-anchor="middle" font-size="11" font-weight="800" fill="#694600" transform="rotate(${labelAngle.toFixed(2)} ${rect.cx.toFixed(2)} ${rect.cy.toFixed(2)})">sterownik</text>
+      `;
+    }
+
+    function sideLabels(info) {
+      const [a, b, c] = info.points;
+      // Centroid trójkąta, do obliczania kierunku na zewnątrz
+      const cx = (a.x + b.x + c.x) / 3;
+      const cy = (a.y + b.y + c.y) / 3;
+      const offset = 22; // Odsunięcie etykiety na zewnątrz
+      const items = [
+        { p1: a, p2: b, text: `górny ${info.top.toFixed(0)} mm` },
+        { p1: b, p2: c, text: `prawy ${info.shortest.toFixed(0)} mm` },
+        { p1: c, p2: a, text: `lewy ${info.longest.toFixed(0)} mm` }
+      ];
+      return items.map(item => {
+        const mx = (item.p1.x + item.p2.x) / 2;
+        const my = (item.p1.y + item.p2.y) / 2;
+        // Wektor od środka trójkąta do środka boku (normalna zewnętrzna)
+        const nx = mx - cx;
+        const ny = my - cy;
+        const len = Math.hypot(nx, ny) || 1;
+        const x = mx + (nx / len) * offset;
+        const y = my + (ny / len) * offset;
+        return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="9.5" font-weight="700" fill="rgba(255,255,255,0.75)" letter-spacing="0.03em">${item.text}</text>`;
+      }).join("");
+    }
+
+    function readableTextColor(hex) {
+      const n = parseInt(hex.slice(1), 16);
+      const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+      return (r * 299 + g * 587 + b * 114) / 1000 > 138 ? "#172033" : "#ffffff";
+    }
+
+    function renderSummary(variant, series, assigned) {
+      const stats = packStats(series, variant.cells.length);
+      const p = stats.parallel;
+      const used = stats.usedCells;
+      const unused = variant.cells.length - used;
+      $("summary").innerHTML = `
+        <span class="pill">${variant.cells.length} ogniw</span>
+        <span class="pill">${series}s${p}p${unused ? ` + ${unused} zapas` : ""}</span>
+        <span class="pill">${formatNumber(stats.voltageV)} V</span>
+        <span class="pill">${formatNumber(stats.capacityAh)} Ah</span>
+        <span class="pill">${formatNumber(stats.currentA)} A</span>
+        <span class="pill">${formatNumber(stats.energyWh, 0)} Wh</span>
+        <span class="pill">${variant.layout === "honeycomb" ? "honeycomb" : "kwadrat"}, ${variant.angle.toFixed(0)}°</span>
+        <span class="pill">${variant.controller ? `sterownik ${variant.controller.angle.toFixed(0)}°, róg ${cornerNames[variant.controller.cornerIndex] || ""}` : "bez sterownika"}</span>
+      `;
+    }
+
+    function applyVariantTab(tabIdx) {
+      activeVariantTab = tabIdx;
+      manualMode = false;
+      manualVariant = null;
+      selectedCellId = null;
+      render();
+    }
+
+    function renderVariants() {
+      if (!variants.length) { $("variants").innerHTML = ""; return; }
+      const v = variants[0];
+      const tabDefs = [
+        { label: "Wariant 1", sub: "Zazębianie optymalne (SCS)", settings: "scs" },
+        { label: "Wariant 2", sub: "Pionowy wąż", settings: "snake" },
+        { label: "Wariant 3", sub: "(wkrótce kolejna technika)", settings: "future" }
+      ];
+
+      $("variants").innerHTML = `
+        <div class="variant ${manualMode ? "active" : ""}" data-manual-tab="1">
+          <div class="variant-head">
+            <div>
+              <strong>Tryb ręczny</strong>
+              <span>${manualMode ? `Rysowanie S${activeDrawSec + 1}` : "Własne przypisywanie sekcji"}</span>
+            </div>
+            <button class="gear-btn" data-settings-tab="manual" type="button" title="Ustawienia trybu ręcznego">⚙</button>
+          </div>
+          ${openVariantSettings === "manual" ? `
+            <div class="variant-menu">
+              <span>Konfiguracja ręczna używa aktualnego S/P z panelu elektrycznego.</span>
+            </div>
+          ` : ""}
+        </div>
+          ${tabDefs.map((t, i) => `
+            <div class="variant ${!manualMode && i === activeVariantTab ? "active" : ""}" data-tab="${i}">
+              <div class="variant-head">
+                <div>
+                  <strong>${t.label}: ${t.sub}</strong>
+                  <span>${v.cells.length} ogniw · ${v.layout === "honeycomb" ? "Honeycomb" : "Kwadrat"}, ${v.angle.toFixed(0)}°</span>
+                </div>
+                <button class="gear-btn" data-settings-tab="${i}" type="button" title="Ustawienia wariantu">⚙</button>
+              </div>
+              ${renderVariantSettingsMenu(t.settings, i)}
+            </div>`).join("")}
+      `;
+
+      document.querySelectorAll("[data-settings-tab]").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const key = btn.dataset.settingsTab;
+          openVariantSettings = openVariantSettings === key ? null : key;
+          renderVariants();
+        });
+      });
+
+      document.querySelectorAll("[data-manual-tab]").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          if (e.target.closest("[data-settings-tab]")) return;
+          startManualMode();
+        });
+      });
+
+      document.querySelectorAll("[data-tab]").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          if (e.target.closest("[data-settings-tab]") || e.target.closest(".variant-menu")) return;
+          applyVariantTab(Number(btn.dataset.tab));
+          renderVariants();
+        });
+      });
+
+      const edgeWeight = $("variantEdgeWeight");
+      if (edgeWeight) {
+        edgeWeight.addEventListener("input", () => {
+          sectionVariantSettings.edgeWeight = Number(edgeWeight.value);
+          const valueEl = $("variantEdgeWeightValue");
+          if (valueEl) valueEl.textContent = sectionVariantSettings.edgeWeight;
+          render({refreshVariants: false});
+        });
+      }
+    }
+
+    function renderVariantSettingsMenu(kind, tabIndex) {
+      if (String(openVariantSettings) !== String(tabIndex)) return "";
+      if (kind === "scs") {
+        return `
+          <div class="variant-menu">
+            <label>Agresywność zazębiania: <span id="variantEdgeWeightValue" class="variant-menu-value">${sectionVariantSettings.edgeWeight}</span>
+              <input id="variantEdgeWeight" type="range" min="0" max="10" step="1" value="${sectionVariantSettings.edgeWeight}">
+            </label>
+            <span>0 = zwarte sekcje, 10 = mocniejsze przeplatanie sąsiadujących sekcji.</span>
+          </div>
+        `;
+      }
+      if (kind === "snake") {
+        return `
+          <div class="variant-menu">
+            <span>Ten wariant układa sekcje pionowym wężykiem i nie ma dodatkowych parametrów.</span>
+          </div>
+        `;
+      }
+      return `
+        <div class="variant-menu">
+          <span>Parametry tej metody pojawią się po dodaniu kolejnego algorytmu.</span>
+        </div>
+      `;
+    }
+
+    function renderConfigs(total, selectedS) {
+      const stats = packStats(selectedS, total);
+      const p = stats.parallel;
+      const used = stats.usedCells;
+      const unused = total - used;
+
+      const cellCountStr = unused > 0
+        ? `${used} <span style="font-weight: normal; color: var(--muted); font-size: 12px;">(z zapasem: ${total})</span>`
+        : `${used}`;
+
+      $("configs").innerHTML = `
+        <div class="active-config-card" style="grid-column: span 2; width: 100%;">
+          <div class="active-config-title">
+            <span>Parametry pakietu</span>
+            <span style="background: var(--accent); color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Aktywny</span>
+          </div>
+          <div class="active-config-grid">
+            <div class="active-config-row">
+              <span class="active-config-label">Konfiguracja:</span>
+              <span class="active-config-value" style="color: var(--accent-2); font-size: 14px;">${selectedS}s${p}p</span>
+            </div>
+            <div class="active-config-row">
+              <span class="active-config-label">Wymagana liczba ogniw:</span>
+              <span class="active-config-value">${cellCountStr}</span>
+            </div>
+            <div class="active-config-row">
+              <span class="active-config-label">Napięcie nominalne:</span>
+              <span class="active-config-value">${formatNumber(stats.voltageV)} V</span>
+            </div>
+            <div class="active-config-row">
+              <span class="active-config-label">Pojemność pakietu:</span>
+              <span class="active-config-value">${formatNumber(stats.capacityAh)} Ah</span>
+            </div>
+            <div class="active-config-row">
+              <span class="active-config-label">Energia pakietu:</span>
+              <span class="active-config-value">${formatNumber(stats.energyWh, 0)} Wh</span>
+            </div>
+            <div class="active-config-row">
+              <span class="active-config-label">Maks. prąd rozładowania:</span>
+              <span class="active-config-value" style="color: var(--danger); font-size: 14px;">${formatNumber(stats.currentA)} A</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderLegend(series) {
+      const shown = Math.min(series, colors.length);
+      const items = [];
+      for (let i = 0; i < shown; i++) {
+        const isActive = manualMode && i === activeDrawSec;
+        const bgStyle = isActive ? "background: #163b38; border: 1.5px solid var(--accent); font-weight: 800;" : "border: 1.5px solid transparent;";
+        items.push(`<span class="legend-item" data-sidx="${i}" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; padding:3px 8px; border-radius:6px; margin:2px; ${bgStyle}"><i style="background:${colors[i]}; width:12px; height:12px; border-radius:50%; display:inline-block;"></i>S${i + 1}</span>`);
+      }
+      if (series > shown) items.push(`<span>Kolory powtarzają się od S${shown + 1}</span>`);
+      $("legend").innerHTML = items.join("");
+    }
+
+    async function runSolve() {
+      const runId = ++solveRunId;
+      const btn = $("solveBtn");
+      btn.disabled = true;
+      $("status").className = "status";
+      setProgress(0, "Start obliczeń...");
+      await new Promise(requestAnimationFrame);
+      try {
+        variants = await solve(setProgress, runId);
+        if (runId !== solveRunId) return;
+        activeIndex = 0;
+        if (!variants.length) {
+          throw new Error("Nie znaleziono wariantu. Zmniejsz margines, sterownik lub odstępy między ogniwami.");
+        }
+        setProgress(100, `Znaleziono ${variants.length} najlepsze warianty. Parametry elektryczne pakietu:`);
+        render();
+      } catch (err) {
+        if (runId !== solveRunId) return;
+        $("status").className = "status error";
+        $("status").textContent = err.message;
+        $("progressBar").style.width = "0";
+      } finally {
+        if (runId === solveRunId) btn.disabled = false;
+      }
+    }
+
+    function loadDemo() {
+      $("sideA").value = 525;
+      $("sideB").value = 455;
+      $("sideC").value = 620;
+      $("cellType").value = "21";
+      $("frameMargin").value = 9;
+      $("cellGap").value = 1.5;
+      $("controllerOn").checked = true;
+      $("controllerW").value = 92;
+      $("controllerH").value = 42;
+      $("cellAh").value = 5;
+      $("cellCurrent").value = 10;
+      $("cellVoltage").value = 3.6;
+      $("seriesSelect").value = "13";
+      $("layoutMode").value = "both";
+      runSolve();
+    }
+
+    function startManualMode() {
+      if (!variants.length || activeIndex >= variants.length) {
+        alert("Najpierw wczytaj przykład lub przelicz pakiet, aby wygenerować bazową siatkę ogniw!");
+        return;
+      }
+
+      const variant = variants[activeIndex];
+      const s = selectedSeries();
+      const p = Math.floor(variant.cells.length / s);
+
+      if (s <= 0 || p <= 0) {
+        alert("Niepoprawna konfiguracja – sprawdź liczby sekcji i ogniw.");
+        return;
+      }
+
+      manualMode = true;
+      manualS = s;
+      manualP = p;
+      activeDrawSec = 0;
+      selectedCellId = null;
+
+      // Klonujemy siatkę i czyścimy przypisania
+      manualVariant = {
+        ...variant,
+        cells: variant.cells.map(c => ({
+          ...c,
+          section: null,
+          parallelIndex: null
+        }))
+      };
+
+      // Synchronizujemy selektor S w panelu bocznym
+      $("seriesSelect").value = "custom";
+      $("customS").value = s;
+      $("customSLabel").style.display = "grid";
+
+      render();
+    }
+
+    function exportSvg() {
+      const svg = $("drawing").cloneNode(true);
+      svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      const blob = new Blob([svg.outerHTML], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "pakiet-baterii-rower.svg";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    $("solveBtn").addEventListener("click", () => {
+      manualMode = false;
+      cellOverrides = {};
+      selectedCellId = null;
+      runSolve();
+    });
+    if ($("manualBtn")) $("manualBtn").addEventListener("click", startManualMode);
+    $("demoBtn").addEventListener("click", () => {
+      manualMode = false;
+      loadDemo();
+    });
+    $("exportBtn").addEventListener("click", exportSvg);
+    $("seriesSelect").addEventListener("change", () => {
+      if (!manualMode) {
+        $("customSLabel").style.display = $("seriesSelect").value === "custom" ? "grid" : "none";
+        render();
+      }
+    });
+    $("customS").addEventListener("input", () => {
+      if (!manualMode) render();
+    });
+    $("legend").addEventListener("click", (e) => {
+      if (!manualMode) return;
+      const item = e.target.closest(".legend-item");
+      if (!item) return;
+      activeDrawSec = Number(item.dataset.sidx);
+      render();
+    });
+    ["cellAh", "cellCurrent", "cellVoltage"].forEach(id => $(id).addEventListener("input", render));
+    runSolve();
+  </script>
+</body>
+
+</html>
