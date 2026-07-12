@@ -1,0 +1,108 @@
+{
+  "schema_version": "1.0.0",
+  "dataset_id": "battery_strip_materials",
+  "reference_temperature_C": 20,
+  "description_pl": "Startowe właściwości materiałów taśm łączących ogniwa. Wartości nominalne służą do symulacji, a zakresy do analizy wrażliwości.",
+  "materials": {
+    "pure_nickel_Ni200": {
+      "name_pl": "Czysty nikiel Ni200",
+      "display_color_hex": "#cbd5e1",
+      "base_material": "nickel",
+      "electrical_resistivity_ohm_m": {
+        "nominal": 9.0e-8,
+        "min": 7.0e-8,
+        "max": 9.6e-8
+      },
+      "temperature_coefficient_1_K": 0.005,
+      "thermal_conductivity_W_mK": 71,
+      "specific_heat_J_kgK": 456,
+      "density_kg_m3": 8900,
+      "melting_temperature_C": {
+        "min": 1435,
+        "max": 1446,
+        "approximate": false
+      },
+      "notes_pl": [
+        "Wartość nominalna 9,0e-8 Ω·m jest konserwatywnym ustawieniem dla komercyjnej taśmy Ni200.",
+        "Wartość około 6,99e-8 Ω·m dotyczy bardzo czystego niklu i nie powinna być bez pomiaru stosowana do każdej taśmy Ni200."
+      ]
+    },
+    "nickel_plated_low_carbon_steel": {
+      "name_pl": "Stal niskowęglowa niklowana",
+      "display_color_hex": "#94a3b8",
+      "base_material": "low_carbon_steel",
+      "coating": "nickel",
+      "electrical_resistivity_ohm_m": {
+        "nominal": 1.8e-7,
+        "min": 1.6e-7,
+        "max": 2.9e-7
+      },
+      "temperature_coefficient_1_K": 0.004,
+      "thermal_conductivity_W_mK": 52,
+      "specific_heat_J_kgK": 486,
+      "density_kg_m3": 7870,
+      "melting_temperature_C": {
+        "min": 1450,
+        "max": 1450,
+        "approximate": true
+      },
+      "notes_pl": [
+        "Cienka powłoka niklowa nie zmienia stalowego rdzenia w elektryczny odpowiednik czystego niklu.",
+        "Parametry ofert handlowych silnie się różnią; pomiar konkretnej taśmy powinien mieć pierwszeństwo."
+      ]
+    },
+    "copper_C110": {
+      "name_pl": "Miedź C110",
+      "display_color_hex": "#d97706",
+      "base_material": "copper",
+      "electrical_resistivity_ohm_m": {
+        "nominal": 1.72e-8,
+        "min": 1.68e-8,
+        "max": 1.75e-8
+      },
+      "temperature_coefficient_1_K": 0.00393,
+      "thermal_conductivity_W_mK": 390,
+      "specific_heat_J_kgK": 385,
+      "density_kg_m3": 8910,
+      "melting_temperature_C": {
+        "min": 1085,
+        "max": 1085,
+        "approximate": false
+      },
+      "notes_pl": [
+        "Niklowana taśma miedziana zachowuje parametry zbliżone do miedzi, ponieważ prąd wzdłuż taśmy płynie głównie przez miedziany rdzeń."
+      ]
+    },
+    "stainless_steel_304": {
+      "name_pl": "Stal nierdzewna 304",
+      "display_color_hex": "#a7b0bf",
+      "base_material": "stainless_steel_304",
+      "electrical_resistivity_ohm_m": {
+        "nominal": 7.2e-7,
+        "min": 6.9e-7,
+        "max": 7.5e-7
+      },
+      "temperature_coefficient_1_K": 0.00094,
+      "thermal_conductivity_W_mK": 16,
+      "specific_heat_J_kgK": 500,
+      "density_kg_m3": 8000,
+      "melting_temperature_C": {
+        "min": 1400,
+        "max": 1450,
+        "approximate": true
+      },
+      "notes_pl": [
+        "Materiał opcjonalny. Nie należy utożsamiać go z nieokreśloną handlowo 'taśmą stalową'."
+      ]
+    }
+  },
+  "provenance": {
+    "status": "engineering_start_values",
+    "provided_sources": [
+      "VDM Nickel 200/201",
+      "Special Metals Nickel 200",
+      "Copper Development Association C11000"
+    ],
+    "measurement_policy_pl": "Dla rzeczywistej taśmy wartość zmierzona ma pierwszeństwo przed wartością nominalną materiału."
+  }
+}

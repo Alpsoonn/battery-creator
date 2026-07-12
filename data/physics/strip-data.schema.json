@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "strip-data.schema.json",
+  "title": "Battery strip material dataset",
+  "type": "object",
+  "required": ["schema_version", "dataset_id"],
+  "properties": {
+    "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "dataset_id": { "type": "string", "minLength": 1 },
+    "reference_temperature_C": { "type": "number" },
+    "reference_length_mm": { "type": "number", "exclusiveMinimum": 0 },
+    "materials": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/material" }
+    },
+    "presets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/preset" }
+    }
+  },
+  "$defs": {
+    "positiveNumber": { "type": "number", "exclusiveMinimum": 0 },
+    "material": {
+      "type": "object",
+      "required": [
+        "name_pl",
+        "electrical_resistivity_ohm_m",
+        "temperature_coefficient_1_K",
+        "thermal_conductivity_W_mK",
+        "specific_heat_J_kgK",
+        "density_kg_m3",
+        "melting_temperature_C"
+      ],
+      "properties": {
+        "name_pl": { "type": "string" },
+        "display_color_hex": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "electrical_resistivity_ohm_m": {
+          "type": "object",
+          "required": ["nominal", "min", "max"],
+          "properties": {
+            "nominal": { "$ref": "#/$defs/positiveNumber" },
+            "min": { "$ref": "#/$defs/positiveNumber" },
+            "max": { "$ref": "#/$defs/positiveNumber" }
+          },
+          "additionalProperties": false
+        },
+        "temperature_coefficient_1_K": { "type": "number", "minimum": 0 },
+        "thermal_conductivity_W_mK": { "$ref": "#/$defs/positiveNumber" },
+        "specific_heat_J_kgK": { "$ref": "#/$defs/positiveNumber" },
+        "density_kg_m3": { "$ref": "#/$defs/positiveNumber" },
+        "melting_temperature_C": {
+          "type": "object",
+          "required": ["min", "max", "approximate"],
+          "properties": {
+            "min": { "$ref": "#/$defs/positiveNumber" },
+            "max": { "$ref": "#/$defs/positiveNumber" },
+            "approximate": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "preset": {
+      "type": "object",
+      "required": ["id", "thickness_mm", "width_mm", "cross_section_mm2", "resistance_mohm_per_100mm"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "thickness_mm": { "$ref": "#/$defs/positiveNumber" },
+        "width_mm": { "$ref": "#/$defs/positiveNumber" },
+        "cross_section_mm2": { "$ref": "#/$defs/positiveNumber" },
+        "resistance_mohm_per_100mm": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/positiveNumber" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

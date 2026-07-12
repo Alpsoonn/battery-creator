@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0.0",
+  "dataset_id": "battery_strip_size_presets",
+  "reference_temperature_C": 20,
+  "reference_length_mm": 100,
+  "description_pl": "Popularne geometrie taśm i referencyjne rezystancje odcinka 100 mm, bez rezystancji zgrzewów i połączeń kontaktowych.",
+  "presets": [
+    { "id": "strip_0_10x6",  "thickness_mm": 0.10, "width_mm": 6,  "cross_section_mm2": 0.60, "resistance_mohm_per_100mm": { "pure_nickel_Ni200": 15.00, "nickel_plated_low_carbon_steel": 30.00, "copper_C110": 2.87 } },
+    { "id": "strip_0_10x8",  "thickness_mm": 0.10, "width_mm": 8,  "cross_section_mm2": 0.80, "resistance_mohm_per_100mm": { "pure_nickel_Ni200": 11.25, "nickel_plated_low_carbon_steel": 22.50, "copper_C110": 2.15 } },
+    { "id": "strip_0_15x6",  "thickness_mm": 0.15, "width_mm": 6,  "cross_section_mm2": 0.90, "resistance_mohm_per_100mm": { "pure_nickel_Ni200": 10.00, "nickel_plated_low_carbon_steel": 20.00, "copper_C110": 1.91 } },
+    { "id": "strip_0_15x8",  "thickness_mm": 0.15, "width_mm": 8,  "cross_section_mm2": 1.20, "resistance_mohm_per_100mm": { "pure_nickel_Ni200": 7.50,  "nickel_plated_low_carbon_steel": 15.00, "copper_C110": 1.43 } },
+    { "id": "strip_0_15x10", "thickness_mm": 0.15, "width_mm": 10, "cross_section_mm2": 1.50, "resistance_mohm_per_100mm": { "pure_nickel_Ni200": 6.00,  "nickel_plated_low_carbon_steel": 12.00, "copper_C110": 1.15 } },
+    { "id": "strip_0_20x8",  "thickness_mm": 0.20, "width_mm": 8,  "cross_section_mm2": 1.60, "resistance_mohm_per_100mm": { "pure_nickel_Ni200": 5.63,  "nickel_plated_low_carbon_steel": 11.25, "copper_C110": 1.08 } },
+    { "id": "strip_0_20x10", "thickness_mm": 0.20, "width_mm": 10, "cross_section_mm2": 2.00, "resistance_mohm_per_100mm": { "pure_nickel_Ni200": 4.50,  "nickel_plated_low_carbon_steel": 9.00,  "copper_C110": 0.86 } },
+    { "id": "strip_0_20x12", "thickness_mm": 0.20, "width_mm": 12, "cross_section_mm2": 2.40, "resistance_mohm_per_100mm": { "pure_nickel_Ni200": 3.75,  "nickel_plated_low_carbon_steel": 7.50,  "copper_C110": 0.72 } },
+    { "id": "strip_0_20x15", "thickness_mm": 0.20, "width_mm": 15, "cross_section_mm2": 3.00, "resistance_mohm_per_100mm": { "pure_nickel_Ni200": 3.00,  "nickel_plated_low_carbon_steel": 6.00,  "copper_C110": 0.57 } },
+    { "id": "strip_0_30x10", "thickness_mm": 0.30, "width_mm": 10, "cross_section_mm2": 3.00, "resistance_mohm_per_100mm": { "pure_nickel_Ni200": 3.00,  "nickel_plated_low_carbon_steel": 6.00,  "copper_C110": 0.57 } },
+    { "id": "strip_0_30x15", "thickness_mm": 0.30, "width_mm": 15, "cross_section_mm2": 4.50, "resistance_mohm_per_100mm": { "pure_nickel_Ni200": 2.00,  "nickel_plated_low_carbon_steel": 4.00,  "copper_C110": 0.38 } },
+    { "id": "strip_0_30x20", "thickness_mm": 0.30, "width_mm": 20, "cross_section_mm2": 6.00, "resistance_mohm_per_100mm": { "pure_nickel_Ni200": 1.50,  "nickel_plated_low_carbon_steel": 3.00,  "copper_C110": 0.29 } }
+  ],
+  "custom_strip_template": {
+    "material_id": "pure_nickel_Ni200",
+    "width_mm": 8,
+    "thickness_mm": 0.15,
+    "layers": 1,
+    "measured_resistance_mohm_per_100mm": null,
+    "contact_resistance_mohm_per_joint": 0,
+    "weld_resistance_mohm_per_weld": 0
+  }
+}
