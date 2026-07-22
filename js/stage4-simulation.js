@@ -408,12 +408,17 @@
 
     temperatureAdjustedChargeLimitA() {
       const curve = this.package?.cellModel?.charge_current_temperature_factor;
+      const factorAt = temperatureC => {
+        const factor = Number(interp(curve, Number(temperatureC)));
+        return Number.isFinite(factor) ? clamp(factor, 0, 1) : 0;
+      };
       if (!this.cellsBySection?.length || !this.cells.length) {
-        const factor = clamp(interp(curve, this.package?.cellModel?.initial_temperature_C ?? 25), 0, 1);
+        const factor = factorAt(this.package?.cellModel?.initial_temperature_C ?? 25);
         return this.packCurrentLimits("charge").maximumA * factor;
       }
       const sectionLimits = this.cellsBySection.filter(section => section.length).map(section => section.reduce((sum, cell) => {
-        return sum + cell.maxChargeCurrentA * clamp(interp(curve, cell.tempC), 0, 1);
+        const maximumA = Number(cell.maxChargeCurrentA);
+        return sum + (Number.isFinite(maximumA) && maximumA > 0 ? maximumA : 0) * factorAt(cell.tempC);
       }, 0));
       return sectionLimits.length ? Math.min(...sectionLimits) : 0;
     }
@@ -1185,13 +1190,26 @@
       const direction = settings.mode === "charge" ? -1 : 1;
       if (settings.mode === "charge") {
         const temperatureLimit = this.temperatureAdjustedChargeLimitA();
+        const maximumChargeCurrentA = Math.max(0, Math.min(settings.currentA, temperatureLimit));
+        if (!(maximumChargeCurrentA > 0)) return 0;
         if (this.chargePhase === "CV") {
           const target = this.package.series * this.package.cellModel.voltage_max_V;
-          const voltageError = Math.max(0, target - (this.packVoltage || 0));
           const estimatedR = this.cells.reduce((sum, cell) => sum + cell.resistanceOhm, 0) / Math.max(1, this.package.parallel * this.package.parallel);
-          return -Math.min(settings.currentA, temperatureLimit, estimatedR > 0 ? voltageError / estimatedR : settings.currentA);
+          const previousChargeCurrentA = clamp(Math.max(0, -this.solvedPackCurrentA), 0, maximumChargeCurrentA);
+          const packCandidateA = estimatedR > 0
+            ? previousChargeCurrentA + (target - (this.packVoltage || 0)) / estimatedR
+            : maximumChargeCurrentA;
+          const limitingCell = this.cells.reduce((highest, cell) => !highest || cell.localVoltageV > highest.localVoltageV ? cell : highest, null);
+          let cellCandidateA = maximumChargeCurrentA;
+          if (limitingCell && Number.isFinite(limitingCell.localVoltageV)) {
+            const sectionParallel = Math.max(1, this.cellsBySection[limitingCell.section]?.length || this.package.parallel || 1);
+            const cellResponseVPerPackA = Math.max(1e-6, limitingCell.r0Ohm / sectionParallel);
+            cellCandidateA = previousChargeCurrentA
+              + (limitingCell.voltageMaxV - limitingCell.localVoltageV) / cellResponseVPerPackA;
+          }
+          return -clamp(Math.min(packCandidateA, cellCandidateA), 0, maximumChargeCurrentA);
         }
-        return -Math.min(settings.currentA, temperatureLimit);
+        return -maximumChargeCurrentA;
       }
       if (settings.loadMode === "power") return settings.powerW / Math.max(.1, Math.abs(this.packVoltage || this.package.series * this.package.cellModel.voltage_nominal_V));
       return direction * settings.currentA;
@@ -1219,6 +1237,7 @@
     loadCommandDescriptor(commandedPackCurrentA) {
       const settings = this.settings();
       if (!this.bms.connected) return { source: "BMS", reason: "obciążenie odłączone przez BMS" };
+      if (this.status !== "running" && Math.abs(commandedPackCurrentA) <= 1e-9) return { source: "model", reason: "stan spoczynkowy przed uruchomieniem symulacji" };
       if (settings.mode === "charge" && this.chargePhase === "CV") return { source: "CC/CV", reason: "regulacja napięcia w fazie CV" };
       if (settings.mode === "charge") {
         const limited = Math.abs(commandedPackCurrentA) + 1e-6 < settings.currentA;
@@ -2065,10 +2084,10 @@
       const sectionVoltages = this.sectionBmsVoltages?.length === this.package.series ? this.sectionBmsVoltages : this.groupVoltages;
       const maximumSectionVoltage = Math.max(...sectionVoltages), minimumSectionVoltage = Math.min(...sectionVoltages);
       const checks = [
-        { key: "OV", active: maximumSectionVoltage > num("stage4BmsVmax", 4.2), value: maximumSectionVoltage, threshold: num("stage4BmsVmax", 4.2), delay: num("stage4BmsVmaxDelay", 1), element: `S${sectionVoltages.indexOf(maximumSectionVoltage) + 1}` },
-        { key: "UV", active: minimumSectionVoltage < num("stage4BmsVmin", 2.8), value: minimumSectionVoltage, threshold: num("stage4BmsVmin", 2.8), delay: num("stage4BmsVminDelay", 1), element: `S${sectionVoltages.indexOf(minimumSectionVoltage) + 1}` },
-        { key: "OC_DISCHARGE", active: packCurrent > num("stage4BmsDischargeA", 100), value: packCurrent, threshold: num("stage4BmsDischargeA", 100), delay: num("stage4BmsDischargeDelay", 2), element: "pakiet" },
-        { key: "OC_CHARGE", active: -packCurrent > num("stage4BmsChargeA", 50), value: -packCurrent, threshold: num("stage4BmsChargeA", 50), delay: num("stage4BmsChargeDelay", 2), element: "pakiet" },
+        { key: "OV", active: mode === "charge" && maximumSectionVoltage > num("stage4BmsVmax", 4.2), value: maximumSectionVoltage, threshold: num("stage4BmsVmax", 4.2), delay: num("stage4BmsVmaxDelay", 1), element: `S${sectionVoltages.indexOf(maximumSectionVoltage) + 1}` },
+        { key: "UV", active: mode === "discharge" && minimumSectionVoltage < num("stage4BmsVmin", 2.8), value: minimumSectionVoltage, threshold: num("stage4BmsVmin", 2.8), delay: num("stage4BmsVminDelay", 1), element: `S${sectionVoltages.indexOf(minimumSectionVoltage) + 1}` },
+        { key: "OC_DISCHARGE", active: mode === "discharge" && packCurrent > num("stage4BmsDischargeA", 100), value: packCurrent, threshold: num("stage4BmsDischargeA", 100), delay: num("stage4BmsDischargeDelay", 2), element: "pakiet" },
+        { key: "OC_CHARGE", active: mode === "charge" && -packCurrent > num("stage4BmsChargeA", 50), value: -packCurrent, threshold: num("stage4BmsChargeA", 50), delay: num("stage4BmsChargeDelay", 2), element: "pakiet" },
         { key: "OT_DISCHARGE", active: settings.temperatureProtection && mode === "discharge" && maxT > num("stage4BmsDischargeTmax", 80), value: maxT, threshold: num("stage4BmsDischargeTmax", 80), delay: num("stage4BmsDischargeTmaxDelay", 2), element: this.hottestCellLabel() },
         { key: "OT_CHARGE", active: settings.temperatureProtection && mode === "charge" && maxT > num("stage4BmsChargeTmax", 45), value: maxT, threshold: num("stage4BmsChargeTmax", 45), delay: num("stage4BmsChargeTmaxDelay", 2), element: this.hottestCellLabel() },
         { key: "UT_CHARGE", active: settings.temperatureProtection && mode === "charge" && minT < num("stage4BmsChargeTmin", 0), value: minT, threshold: num("stage4BmsChargeTmin", 0), delay: num("stage4BmsChargeTminDelay", 1), element: this.coldestCellLabel() },
@@ -2103,7 +2122,9 @@
       const sectionVoltages = this.sectionBmsVoltages?.length === this.package.series ? this.sectionBmsVoltages : this.groupVoltages;
       const maxGroup = Math.max(...sectionVoltages), minGroup = Math.min(...sectionVoltages), maxTemp = Math.max(...this.cells.map(c => c.tempC)), minTemp = Math.min(...this.cells.map(c => c.tempC));
       const settings = this.settings(), mode = settings.mode;
-      const voltageSafe = maxGroup <= num("stage4BmsVmax", 4.2) - voltageHysteresis && minGroup >= num("stage4BmsVmin", 2.8) + voltageHysteresis;
+      const voltageSafe = mode === "charge"
+        ? maxGroup <= num("stage4BmsVmax", 4.2) - voltageHysteresis
+        : minGroup >= num("stage4BmsVmin", 2.8) + voltageHysteresis;
       const temperatureSafe = !settings.temperatureProtection || (mode === "charge"
         ? maxTemp <= num("stage4BmsChargeTmax", 45) - tempHysteresis && minTemp >= num("stage4BmsChargeTmin", 0) + tempHysteresis
         : maxTemp <= num("stage4BmsDischargeTmax", 80) - tempHysteresis && minTemp >= num("stage4BmsDischargeTmin", -20) + tempHysteresis);
@@ -2118,10 +2139,9 @@
     }
 
     checkEndConditions(packCurrent) {
-      const settings = this.settings(), maxT = Math.max(...this.cells.map(c => c.tempC)), minT = Math.min(...this.cells.map(c => c.tempC)), minSoc = Math.min(...this.cells.map(c => c.soc)), maxSoc = Math.max(...this.cells.map(c => c.soc));
+      const settings = this.settings(), maxT = Math.max(...this.cells.map(c => c.tempC)), minT = Math.min(...this.cells.map(c => c.tempC)), minSoc = Math.min(...this.cells.map(c => c.soc));
       if (this.time >= settings.durationS) return this.stop("Osiągnięto maksymalny czas symulacji.");
       if (settings.mode === "discharge" && minSoc <= .001) return this.stop("Ogniwo osiągnęło minimalny SOC.");
-      if (settings.mode === "charge" && maxSoc >= 99.999) return this.stop("Ogniwo osiągnęło 100% SOC.");
       if (settings.mode === "charge" && this.chargePhase === "CV" && Math.abs(packCurrent) <= settings.cvEndA) return this.stop("Ładowanie CC/CV zakończone: prąd CV spadł poniżej progu.");
       const lowVoltageCell = settings.mode === "discharge" ? this.cells.find(cell => cell.voltageV <= cell.voltageMinV) : null;
       const highVoltageCell = settings.mode === "charge" ? this.cells.find(cell => cell.voltageV >= cell.voltageMaxV * 1.005) : null;

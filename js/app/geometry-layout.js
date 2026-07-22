@@ -1,6 +1,18 @@
   // ===== Mode switcher =====
+  function placeStage1CellDefinitionControls(inManualPanel) {
+    const controls = $("stage1CellDefinitionControls");
+    const mount = $(inManualPanel ? "manualCellDefinitionMount" : "autoCellDefinitionMount");
+    if (controls && mount && controls.parentElement !== mount) mount.appendChild(controls);
+    if ($("automaticLayoutModeField")) $("automaticLayoutModeField").hidden = inManualPanel;
+  }
+
   function setAutoMode() {
+    if (boundaryType === "none") {
+      setManualModeBtn();
+      return;
+    }
     manualMode = false;
+    placeStage1CellDefinitionControls(false);
     $('btn-auto-mode').classList.add('active');
     $('btn-manual-mode').classList.remove('active');
     $('btn-manual-mode').textContent = "Pozycjonowanie ręczne";
@@ -14,12 +26,13 @@
   }
 
   function setManualModeBtn() {
+    placeStage1CellDefinitionControls(true);
     $('btn-auto-mode').classList.remove('active');
     $('btn-manual-mode').classList.add('active');
     $('btn-manual-mode').textContent = "Pozycjonowanie ręczne";
     $("stage1-positioning-mode-tabs").style.display = stage1Substep === 2 ? "" : "none";
     $('autoPanel').style.display = stage1Substep === 1 ? '' : 'none';
-    $('manualModePanel').style.display = stage1Substep === 2 ? '' : 'none';
+    $('manualModePanel').style.display = stage1Substep === 2 ? 'grid' : 'none';
 
     startManualMode();
   }
@@ -56,24 +69,35 @@
         return;
       }
     }
+    if (step === 2 && boundaryType === "none") manualMode = true;
     stage1Substep = step;
     $("btn-manual-mode").textContent = "Pozycjonowanie ręczne";
     $("stage1-boundary-step").classList.toggle("active", step === 1);
     $("stage1-placement-step").classList.toggle("active", step === 2);
     $("stage1-positioning-mode-tabs").style.display = step === 2 ? "" : "none";
     $("autoPanel").style.display = (!manualMode || step === 1) ? "" : "none";
-    $("manualModePanel").style.display = manualMode && step === 2 ? "" : "none";
+    $("manualModePanel").style.display = manualMode && step === 2 ? "grid" : "none";
     $("placementControls").style.display = step === 2 && !manualMode ? "" : "none";
+    placeStage1CellDefinitionControls(manualMode && step === 2);
+    $("btn-auto-mode").classList.toggle("active", !manualMode);
+    $("btn-manual-mode").classList.toggle("active", manualMode);
     updateBoundaryTypeUI();
+    if (step === 2 && boundaryType === "none") {
+      startManualMode();
+      return;
+    }
     render();
     if (step === 2 && !manualMode) runSolve();
   }
 
   function updateBoundaryTypeUI() {
     boundaryType = $("boundaryType").value;
+    $("autoBoundaryControls").style.display = stage1Substep === 1 ? "" : "none";
     $("triangleBoundaryControls").style.display = boundaryType === "triangle" ? "" : "none";
     $("rectangleBoundaryControls").style.display = boundaryType === "rectangle" ? "" : "none";
     $("manualBoundaryPanel").style.display = boundaryType === "manual" && stage1Substep === 1 ? "" : "none";
+    if ($("noBoundaryNotice")) $("noBoundaryNotice").style.display = boundaryType === "none" ? "block" : "none";
+    $("btn-auto-mode").disabled = boundaryType === "none";
   }
 
   function rectangleFromSize() {
@@ -180,6 +204,7 @@
   }
 
   function activeBoundary() {
+    if (boundaryType === "none") return { type: "none", points: [] };
     if (boundaryType === "rectangle") return rectangleFromSize();
     if (boundaryType === "manual") return { type: "manual", points: [...manualBoundaryPoints], edges: [...manualBoundaryEdges], samples: sampleManualBoundary() };
     return triangleFromSides([readNumber("sideA"), readNumber("sideB"), readNumber("sideC")]);
@@ -191,6 +216,13 @@
 
   function commitBoundaryForPlacement() {
     const boundary = activeBoundary();
+    if (boundary.type === "none") {
+      placementBoundary = { type: "none", points: [], areaMm2: null };
+      variants = [];
+      activeIndex = 0;
+      manualVariant = null;
+      return placementBoundary;
+    }
     if (boundary.type === "manual" && (!manualBoundaryClosed || manualBoundaryPoints.length < 3)) {
       throw new Error("Najpierw zamknij wielobok wyznaczający granicę.");
     }
@@ -386,20 +418,24 @@
     manualBoundaryPoints = state.points;
     manualBoundaryEdges = state.edges;
     manualBoundaryClosed = state.closed;
-    boundaryReferenceImage = state.image || null;
+    boundaryReferenceImage = normalizeBoundaryImageObject(state.image || null);
     boundaryImageSelected = false;
+    boundaryImageCalibration = { active: false, points: [] };
+    boundaryImageFieldBefore = null;
     manualBoundaryActiveEndpoint = null;
     boundaryClickSuppressed = true;
     renderBoundaryStage();
   }
 
   function undoBoundaryChange() {
+    finishBoundaryImagePropertyEdit();
     if (boundaryHistoryIndex <= 0) return;
     boundaryHistoryIndex--;
     restoreBoundaryHistory(boundaryHistory[boundaryHistoryIndex]);
   }
 
   function redoBoundaryChange() {
+    finishBoundaryImagePropertyEdit();
     if (boundaryHistoryIndex >= boundaryHistory.length - 1) return;
     boundaryHistoryIndex++;
     restoreBoundaryHistory(boundaryHistory[boundaryHistoryIndex]);
@@ -483,7 +519,15 @@
     const svg = $("drawing");
     $("manualTransformTools").hidden = true;
     svg.onwheel = e => zoomWorkspace(e, svg);
-    if (boundaryType === "manual") {
+    if (boundaryType === "none") {
+      setWorkspaceViewBox(svg);
+      svg.innerHTML = `<g pointer-events="none"><text x="0" y="-8" text-anchor="middle" fill="#cbd5e1" font-size="18" font-weight="800">Bez obudowy</text><text x="0" y="18" text-anchor="middle" fill="#64748b" font-size="11">Przejdź do umiejscawiania ogniw — uruchomiony zostanie tryb ręczny.</text></g>`;
+      svg.onclick = null;
+      svg.ondblclick = null;
+      svg.oncontextmenu = null;
+      svg.onmousemove = null;
+      svg.onpointerdown = e => { beginWorkspacePan(e, svg); };
+    } else if (boundaryType === "manual") {
       const points = manualBoundaryPoints.length ? manualBoundaryPoints : [{ x: -220, y: -150 }, { x: 220, y: -150 }, { x: 0, y: 200 }];
       const bounds = polygonBounds(points), pad = 70;
       setWorkspaceViewBox(svg);
@@ -504,6 +548,10 @@
       svg.onclick = e => {
         if (workspacePan?.moved || workspacePanJustMoved) { workspacePan = null; workspacePanJustMoved = false; return; }
         if (boundaryClickSuppressed) { boundaryClickSuppressed = false; return; }
+        if (boundaryImageCalibration.active) {
+          addBoundaryImageCalibrationPoint(svgPoint(e, svg));
+          return;
+        }
         const imageTarget = e.target.closest("[data-boundary-image]");
         if (imageTarget) {
           if (!boundaryImageSelected) {
@@ -516,7 +564,7 @@
           renderBoundaryStage();
           return;
         }
-        if (boundaryReferenceImage && !boundaryImageLocked) return;
+        if (boundaryReferenceImage && !boundaryReferenceImage.locked) return;
         const edgeElement = e.target.closest(".boundary-edge");
         if (edgeElement) {
           const point = svgPoint(e, svg);
@@ -558,7 +606,7 @@
         renderBoundaryStage();
       };
       svg.ondblclick = e => {
-        if (boundaryReferenceImage && !boundaryImageLocked) return;
+        if (boundaryImageCalibration.active || (boundaryReferenceImage && !boundaryReferenceImage.locked)) return;
         const edgeElement = e.target.closest(".boundary-edge");
         if (!edgeElement) return;
         e.preventDefault();
@@ -570,34 +618,16 @@
       };
       svg.onpointerdown = e => {
         if (beginWorkspacePan(e, svg)) return;
-        const image = e.target.closest("[data-boundary-image]");
-        if (image && boundaryReferenceImage && e.button === 0) {
+        if (boundaryImageCalibration.active && e.button === 0) {
           e.preventDefault();
-          if (svg.setPointerCapture) svg.setPointerCapture(e.pointerId);
-          const point = svgPoint(e, svg);
-          const rotateHandle = e.target.closest("[data-boundary-image-rotate]");
-          const scaleHandle = e.target.closest("[data-boundary-image-scale]");
-
-          let newlySelected = false;
-          if (!boundaryImageSelected) {
-            boundaryImageSelected = true;
-            newlySelected = true;
-          }
-
-          boundaryImageDrag = {
-            mode: rotateHandle ? "rotate" : scaleHandle ? "scale" : "move",
-            start: point,
-            image: { ...boundaryReferenceImage },
-            before: boundarySnapshot(),
-            startDistance: Math.hypot(point.x - boundaryReferenceImage.x, point.y - boundaryReferenceImage.y),
-            startAngle: Math.atan2(point.y - boundaryReferenceImage.y, point.x - boundaryReferenceImage.x)
-          };
-          
-          if (newlySelected) renderBoundaryStage();
+          e.stopPropagation();
+          addBoundaryImageCalibrationPoint(svgPoint(e, svg));
+          boundaryClickSuppressed = true;
           return;
         }
+        if (beginBoundaryImageInteraction(e, svg)) return;
 
-        if (boundaryReferenceImage && !boundaryImageLocked) return;
+        if (boundaryReferenceImage && !boundaryReferenceImage.locked) return;
 
         const node = e.target.closest(".boundary-node");
         const control = e.target.closest(".boundary-control");
@@ -634,8 +664,12 @@
       };
 
       svg.onmousemove = e => {
-        if (e.target.closest("[data-boundary-image-rotate]")) svg.style.cursor = "grab";
-        else if (e.target.closest("[data-boundary-image-scale]")) svg.style.cursor = e.target.getAttribute("style")?.match(/cursor:([^;]+)/)?.[1] || "nwse-resize";
+        if (boundaryImageCalibration.active) svg.style.cursor = "crosshair";
+        else if (e.target.closest("[data-boundary-image-rotate]")) svg.style.cursor = boundaryImageDrag?.mode === "rotating" ? "grabbing" : "grab";
+        else if (e.target.closest("[data-boundary-image-scale]")) {
+          const handle = e.target.closest("[data-boundary-image-scale]").dataset.boundaryImageScale;
+          svg.style.cursor = ({ n: "ns-resize", s: "ns-resize", e: "ew-resize", w: "ew-resize", nw: "nwse-resize", se: "nwse-resize", ne: "nesw-resize", sw: "nesw-resize" })[handle] || "nwse-resize";
+        }
         else if (e.target.closest("[data-boundary-image]")) svg.style.cursor = "move";
         else svg.style.cursor = "default";
       };
@@ -1248,6 +1282,7 @@
     const layoutPref = $("layoutMode").value;
     const layouts = layoutPref === "both" ? ["honeycomb", "square"] : [layoutPref];
     const triInfo = cloneBoundary(placementBoundary || activeBoundary());
+    if (triInfo.type === "none") throw new Error("Tryb bez obudowy jest dostępny wyłącznie podczas ręcznego umieszczania ogniw.");
     if (triInfo.type === "manual" && (!manualBoundaryClosed || manualBoundaryPoints.length < 3)) throw new Error("Utwórz i zamknij granicę ręczną przed rozmieszczaniem ogniw.");
     if (boundaryPoints(triInfo).length < 3) throw new Error("Utwórz granicę przed rozmieszczaniem ogniw.");
     const pitch = opts.cellDiameter + opts.cellGap;

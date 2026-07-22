@@ -76,7 +76,7 @@
   }
 
   function queueStage2Assignment(variant, series, edgeWeight, requested = false) {
-    if (!variant || manualMode) return;
+    if (!variant) return;
     const cells = variant.cells || [];
     const previousWeight = sectionVariantSettings.edgeWeight;
     sectionVariantSettings.edgeWeight = edgeWeight;
@@ -101,7 +101,7 @@
   }
 
   function precomputeStage2Aggressiveness(variant, series) {
-    if (manualMode || activeVariantTab !== 0) return;
+    if (activeVariantTab !== 0) return;
     for (let weight = 0; weight <= 10; weight++) {
       if (weight !== sectionVariantSettings.edgeWeight) queueStage2Assignment(variant, series, weight, false);
     }
@@ -524,7 +524,8 @@
         if (slot) {
           updateStage2Cells(sourceCells => {
             sourceCells.push({
-              id: `stage2-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              id: nextCustomCellId(),
+              custom: true,
               x: slot.x,
               y: slot.y,
               section: null,

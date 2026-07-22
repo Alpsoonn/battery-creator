@@ -101,6 +101,55 @@
       }
       return;
     }
+    const editingBoundary = currentStage === 1 && stage1Substep === 1 && boundaryType === "manual";
+    const editingFormField = /^(INPUT|SELECT|TEXTAREA)$/.test(e.target?.tagName || "") || e.target?.isContentEditable;
+    if (editingBoundary && e.key === "Escape") {
+      if (cancelBoundaryImageInteraction()) { e.preventDefault(); return; }
+      if (boundaryImageCalibration.active) {
+        e.preventDefault();
+        boundaryImageCalibration = { active: false, points: [] };
+        $("boundaryImageCalibrationStatus").textContent = "Kalibracja anulowana.";
+        renderBoundaryStage();
+        return;
+      }
+      if (boundaryImageSelected) {
+        e.preventDefault();
+        boundaryImageSelected = false;
+        renderBoundaryStage();
+        return;
+      }
+    }
+    if (editingBoundary && boundaryImageSelected && boundaryReferenceImage && !boundaryReferenceImage.locked && !editingFormField && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+      e.preventDefault();
+      const before = boundarySnapshot(), step = e.shiftKey ? 10 : 1;
+      if (e.key === "ArrowLeft") boundaryReferenceImage.transform.x -= step;
+      if (e.key === "ArrowRight") boundaryReferenceImage.transform.x += step;
+      if (e.key === "ArrowUp") boundaryReferenceImage.transform.y -= step;
+      if (e.key === "ArrowDown") boundaryReferenceImage.transform.y += step;
+      commitBoundaryHistory(before);
+      updateBoundaryImageDom();
+      return;
+    }
+    if (editingBoundary && boundaryImageSelected && boundaryReferenceImage && !editingFormField && (e.key === "Delete" || e.key === "Backspace")) {
+      e.preventDefault();
+      removeBoundaryReferenceImage();
+      return;
+    }
+    if (manualMode && e.key === "Escape" && cancelManualTransformInteraction()) {
+      e.preventDefault();
+      return;
+    }
+    if (manualMode && !editingFormField && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key) && (manualSelectedCellIds.size || manualControllerSelected)) {
+      e.preventDefault();
+      const step = e.shiftKey ? 10 : 1;
+      nudgeManualSelection(e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0, e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0);
+      return;
+    }
+    if (manualMode && !editingFormField && (e.key === "Delete" || e.key === "Backspace") && (manualSelectedCellIds.size || manualControllerSelected)) {
+      e.preventDefault();
+      deleteManualSelection();
+      return;
+    }
     if (e.code === "Space") { spacePressed = true; e.preventDefault(); return; }
     if (currentStage === 3 && e.ctrlKey && e.key.toLowerCase() === "z" && !e.shiftKey) {
       e.preventDefault();
@@ -112,7 +161,6 @@
       redoStage3Nickel();
       return;
     }
-    const editingBoundary = stage1Substep === 1 && boundaryType === "manual";
     if (editingBoundary && e.ctrlKey && e.key.toLowerCase() === "z" && !e.shiftKey) {
       e.preventDefault();
       undoBoundaryChange();
@@ -141,7 +189,18 @@
     }
   });
   document.addEventListener("keyup", e => { if (e.code === "Space") spacePressed = false; });
-  window.addEventListener("mousemove", updateManualGizmoDrag);
+  window.addEventListener("pointermove", updateManualGizmoDrag);
+  window.addEventListener("pointermove", updateManualCellPaint);
+  window.addEventListener("pointerup", e => {
+    finishManualCellPaint(e);
+    finishManualTransformInteraction(e);
+    if (manualSuppressNextClick) setTimeout(() => { manualSuppressNextClick = false; }, 0);
+  });
+  window.addEventListener("pointercancel", e => {
+    finishManualCellPaint(e);
+    manualSuppressNextClick = false;
+    cancelManualTransformInteraction(e);
+  });
   window.addEventListener("pointermove", updateAutomaticControllerDrag);
   window.addEventListener("pointermove", updateWorkspacePan);
   window.addEventListener("pointermove", updateBoundaryDrag);
@@ -151,15 +210,16 @@
   window.addEventListener("pointerup", finishAutomaticControllerDrag);
   window.addEventListener("pointercancel", finishAutomaticControllerDrag);
   window.addEventListener("pointerup", finishBoundaryImageDrag);
-  window.addEventListener("pointercancel", finishBoundaryImageDrag);
+  window.addEventListener("pointercancel", cancelBoundaryImageInteraction);
   window.addEventListener("pointerup", finishWorkspacePan);
   window.addEventListener("pointercancel", finishWorkspacePan);
   window.addEventListener("mouseup", () => {
-    if (manualDrag) commitManualHistory(manualDrag.before);
-    manualDrag = null;
     finishWorkspacePan();
   });
   window.addEventListener("blur", () => {
+    finishManualCellPaint();
+    cancelBoundaryImageInteraction();
+    cancelManualTransformInteraction();
     workspacePan = null;
     workspacePanJustMoved = false;
     autoControllerDrag = null;
@@ -195,43 +255,59 @@
     shellElement.addEventListener("dragover", handleDragOver);
     shellElement.addEventListener("drop", handleDrop);
   }
+  window.addEventListener("resize", () => {
+    if (currentStage === 1 && stage1Substep === 1 && boundaryType === "manual" && boundaryReferenceImage) updateBoundaryImageDom();
+  });
   $("manualGridStyle").addEventListener("change", (e) => {
     const before = manualSnapshot();
     manualGridStyle = e.target.value;
-    commitManualHistory(before);
-    if (manualMode) render();
-  });
-  $("manualCellSize").addEventListener("input", (e) => {
-    const before = manualSnapshot();
-    manualCellSize = Math.max(5, Number(e.target.value) || 21);
+    syncManualGridAttachedCells();
     commitManualHistory(before);
     if (manualMode) render();
   });
   $("manualCellGap").addEventListener("input", (e) => {
     const before = manualSnapshot();
     manualCellGap = Math.max(0, Number(e.target.value) || 0);
+    if ($("cellGap")) $("cellGap").value = String(manualCellGap);
+    syncManualGridAttachedCells();
     commitManualHistory(before);
     if (manualMode) render();
   });
   $("manual-controller-add").addEventListener("click", () => {
     if (!manualVariant) return;
     const before = manualSnapshot();
+    const cx = Number($("manualControllerX").value);
+    const cy = Number($("manualControllerY").value);
     const w = Math.max(1, Number($("manualControllerW").value) || 90);
     const h = Math.max(1, Number($("manualControllerH").value) || 45);
-    if (!manualVariant.controller) manualVariant.controller = { cx: manualGridOrigin.x, cy: manualGridOrigin.y, w, h, angle: 0 };
-    else { manualVariant.controller.w = w; manualVariant.controller.h = h; }
+    const angle = Number($("manualControllerRotation").value);
+    const next = {
+      cx: Number.isFinite(cx) ? cx : manualGridOrigin.x,
+      cy: Number.isFinite(cy) ? cy : manualGridOrigin.y,
+      w,
+      h,
+      angle: Number.isFinite(angle) ? angle : 0
+    };
+    if (!manualVariant.controller) manualVariant.controller = next;
+    else Object.assign(manualVariant.controller, next);
+    manualSelectedCellIds.clear();
     manualControllerSelected = true;
     commitManualHistory(before);
+    syncManualControllerFields();
     if (currentStage === 2) renderStage2(); else render();
   });
-  ["manualControllerW", "manualControllerH"].forEach(id => $(id).addEventListener("input", () => {
-    if (!manualMode || !manualVariant?.controller) return;
-    const before = manualSnapshot();
-    manualVariant.controller.w = Math.max(1, Number($("manualControllerW").value) || 90);
-    manualVariant.controller.h = Math.max(1, Number($("manualControllerH").value) || 45);
-    commitManualHistory(before);
-    if (currentStage === 2) renderStage2(); else render();
-  }));
+  ["manualControllerX", "manualControllerY", "manualControllerW", "manualControllerH", "manualControllerRotation"].forEach(id => {
+    const field = $(id);
+    field.addEventListener("focus", beginManualControllerFieldEdit);
+    field.addEventListener("pointerdown", beginManualControllerFieldEdit);
+    field.addEventListener("input", (e) => applyManualControllerField(id, e.target.value));
+    field.addEventListener("change", finishManualControllerFieldEdit);
+    field.addEventListener("blur", finishManualControllerFieldEdit);
+  });
+  $("manualControllerAspectLock").addEventListener("click", () => {
+    manualControllerAspectLocked = !manualControllerAspectLocked;
+    syncManualControllerFields();
+  });
   $("manual-clear").addEventListener("click", () => {
     if (!manualVariant) startManualMode();
     if (!manualVariant) return;
@@ -396,7 +472,7 @@
     stage2SelectedCellId = null;
     if (currentStage !== 2 || Number($("stage2Method").value) !== 0) return;
     const variant = manualMode ? manualVariant : variants[activeIndex];
-    if (!variant || manualMode) return;
+    if (!variant) return;
     const key = stage2AssignmentKey(variant, variant.cells || [], selectedSeries());
     if (stage2AssignmentVariants.has(key)) {
       stage2AssignmentCache = { key, cells: stage2AssignmentVariants.get(key) };
@@ -534,28 +610,24 @@
     loadBoundaryReferenceImage(e.target.files?.[0]);
     e.target.value = "";
   });
-  $("boundaryImageLock").addEventListener("click", () => {
-    if (!boundaryReferenceImage) return;
-    boundaryImageLocked = !boundaryImageLocked;
-    const btn = $("boundaryImageLock");
-    if (boundaryImageLocked) {
-      btn.textContent = "Odblokuj zdjęcie (wstrzymuje rysowanie)";
-      btn.classList.add("active");
-      boundaryImageSelected = false;
-    } else {
-      btn.textContent = "Zablokuj zdjęcie (odblokowuje rysowanie)";
-      btn.classList.remove("active");
-    }
-    renderBoundaryStage();
+  $("boundaryImageLock").addEventListener("click", () => transformBoundaryImage("lock"));
+  $("boundaryImageVisibility").addEventListener("click", () => transformBoundaryImage("visibility"));
+  $("boundaryImageBackground").addEventListener("click", () => transformBoundaryImage("background"));
+  $("boundaryImageFlipX").addEventListener("click", () => transformBoundaryImage("flip-x"));
+  $("boundaryImageFlipY").addEventListener("click", () => transformBoundaryImage("flip-y"));
+  $("boundaryImageAspectLock").addEventListener("click", () => {
+    boundaryImageAspectLocked = !boundaryImageAspectLocked;
+    updateBoundaryImageTools(false);
   });
-  $("boundaryImageClear").addEventListener("click", () => {
-    if (!boundaryReferenceImage) return;
-    const before = boundarySnapshot();
-    boundaryReferenceImage = null;
-    boundaryImageSelected = false;
-    commitBoundaryHistory(before);
-    updateBoundaryImageTools();
-    renderBoundaryStage();
+  $("boundaryImageCalibrate").addEventListener("click", beginBoundaryImageCalibration);
+  $("boundaryImageClear").addEventListener("click", removeBoundaryReferenceImage);
+  ["boundaryImageX", "boundaryImageY", "boundaryImageWidth", "boundaryImageHeight", "boundaryImageRotation", "boundaryImageScale", "boundaryImageOpacity"].forEach(id => {
+    const field = $(id);
+    field.addEventListener("focus", beginBoundaryImagePropertyEdit);
+    field.addEventListener("pointerdown", beginBoundaryImagePropertyEdit);
+    field.addEventListener("input", e => applyBoundaryImageProperty(id, e.target.value));
+    field.addEventListener("change", finishBoundaryImagePropertyEdit);
+    field.addEventListener("blur", finishBoundaryImagePropertyEdit);
   });
   updateBoundaryTypeUI();
   setStage1Substep(1);

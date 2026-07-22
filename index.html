@@ -170,8 +170,12 @@
           <option value="triangle" selected>Trójkąt</option>
           <option value="rectangle">Prostokąt</option>
           <option value="manual">Granice ręczne</option>
+          <option value="none">Bez obudowy</option>
         </select>
       </label>
+      <div id="noBoundaryNotice" class="status" style="display:none;">
+        Bez obudowy: rysowanie granic nie jest wymagane. Umieszczanie ogniw będzie dostępne wyłącznie w trybie ręcznym i rozpocznie się na pustej planszy.
+      </div>
       <div id="triangleBoundaryControls">
       <div class="row">
         <label>Bok A [mm]<input id="sideA" type="number" min="1" step="1" value="500"></label>
@@ -195,16 +199,47 @@
           <button id="boundaryClear" class="secondary" type="button">Wyczyść granice</button>
           <button id="boundaryImageButton" class="secondary" type="button">Dodaj zdjęcie referencyjne</button>
           <input id="boundaryImageInput" type="file" accept="image/jpeg,image/png" hidden>
-          <div id="boundaryImageTools" hidden style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button id="boundaryImageLock" class="secondary" type="button">Zablokuj zdjęcie (odblokowuje rysowanie)</button>
-            <button id="boundaryImageClear" class="secondary" type="button">Usuń zdjęcie</button>
-            <span class="help" style="width:100%;margin-top:4px;">Kliknij zdjęcie, aby je zaznaczyć i edytować uchwytami.</span>
+          <div id="boundaryImageTools" class="boundary-image-tools" hidden>
+            <div class="boundary-image-tools-head">
+              <strong>Zdjęcie referencyjne</strong>
+              <span id="boundaryImageScaleStatus">Skala nieweryfikowana</span>
+            </div>
+            <div class="boundary-image-actions">
+              <button id="boundaryImageBackground" class="secondary" type="button">Ustaw jako podkład</button>
+              <button id="boundaryImageLock" class="secondary" type="button">Zablokuj</button>
+              <button id="boundaryImageVisibility" class="secondary" type="button">Ukryj</button>
+            </div>
+            <div id="boundaryImageProperties" class="boundary-image-properties" hidden>
+              <div class="boundary-image-property-grid">
+                <label>X [mm]<input id="boundaryImageX" type="number" step="0.01"></label>
+                <label>Y [mm]<input id="boundaryImageY" type="number" step="0.01"></label>
+                <label>Szerokość [mm]<input id="boundaryImageWidth" type="number" min="1" step="0.01"></label>
+                <label>Wysokość [mm]<input id="boundaryImageHeight" type="number" min="1" step="0.01"></label>
+                <label>Obrót [°]<input id="boundaryImageRotation" type="number" step="0.001"></label>
+                <label>Skala [%]<input id="boundaryImageScale" type="number" min="0.1" max="100000" step="0.1"></label>
+              </div>
+              <div class="boundary-image-inline-actions">
+                <button id="boundaryImageAspectLock" class="secondary active" type="button" aria-pressed="true">🔒 Proporcje</button>
+                <button id="boundaryImageFlipX" class="secondary" type="button">Odbij poziomo</button>
+                <button id="boundaryImageFlipY" class="secondary" type="button">Odbij pionowo</button>
+              </div>
+              <label class="boundary-image-opacity">Przezroczystość <output id="boundaryImageOpacityValue">65%</output><input id="boundaryImageOpacity" type="range" min="5" max="100" step="1" value="65"></label>
+            </div>
+            <div class="boundary-image-calibration">
+              <label>Znana odległość [mm]<input id="boundaryImageCalibrationDistance" type="number" min="0.01" step="0.01" value="100"></label>
+              <button id="boundaryImageCalibrate" class="secondary" type="button">Wskaż 2 punkty skali</button>
+              <span id="boundaryImageCalibrationStatus" class="help">Wskaż dwa punkty widoczne na zdjęciu.</span>
+            </div>
+            <button id="boundaryImageClear" class="secondary danger" type="button">Usuń zdjęcie</button>
+            <span class="help">Dodaj JPG/PNG przyciskiem albo przeciągnij plik na planszę. Kliknij zdjęcie, aby je zaznaczyć. Przeciągaj środek, uchwyty skalowania albo uchwyt obrotu. Shift zmienia zachowanie skali/obrotu, Alt skaluje od środka.</span>
           </div>
           <span id="boundaryEditorStatus" class="help">Dodaj pierwszy punkt na planszy.</span>
         </div>
       </div>
 
       <div id="placementControls">
+      <div id="autoCellDefinitionMount">
+      <div id="stage1CellDefinitionControls">
       <h2>Ogniwa i luz</h2>
       <div class="row">
         <label>Typ ogniwa
@@ -214,7 +249,7 @@
             <optgroup id="savedCellFormatOptions" label="Inne zapisane rozmiary"></optgroup>
           </select>
         </label>
-        <label>Układ
+        <label id="automaticLayoutModeField">Układ
           <select id="layoutMode">
             <option value="both" selected>Honeycomb i kwadrat</option>
             <option value="honeycomb">Tylko honeycomb</option>
@@ -228,6 +263,8 @@
           <button id="deleteCellType" class="secondary" type="button" title="Usuń wybrany profil">Usuń</button>
         </div>
         <span id="cellProfileStatus" class="cell-profile-status">Lista pokazuje tylko ogniwa zgodne z wybranym rozmiarem.</span>
+      </div>
+      </div>
       </div>
       <div class="row">
         <label>Margines ramy [mm]<input id="frameMargin" type="number" min="0" step=".5" value="8"></label>
@@ -259,25 +296,46 @@
 
     <!-- MANUAL panel -->
     <div id="manualModePanel">
-      <div class="manual-controls">
-        <label>Styl siatki
-          <select id="manualGridStyle">
-            <option value="honeycomb">Honeycomb</option>
-            <option value="square">Kwadrat</option>
-          </select>
-        </label>
-        <div class="row">
-          <label>Rozmiar ogniwa [mm]<input id="manualCellSize" type="number" min="5" step="0.5" value="21"></label>
-          <label>Odstęp [mm]<input id="manualCellGap" type="number" min="0" step="0.2" value="1.5"></label>
+      <section class="manual-settings-card manual-cell-settings-card">
+        <div id="manualCellDefinitionMount"></div>
+        <div class="manual-controls manual-grid-controls">
+          <h3>Siatka pozycjonowania</h3>
+          <label>Styl siatki
+            <select id="manualGridStyle">
+              <option value="honeycomb">Honeycomb</option>
+              <option value="square">Kwadrat</option>
+            </select>
+          </label>
+          <div class="row">
+            <label>Średnica z danych ogniwa [mm]<input id="manualCellSize" type="number" value="21" readonly aria-readonly="true"></label>
+            <label>Odstęp [mm]<input id="manualCellGap" type="number" min="0" step="0.2" value="1.5"></label>
+          </div>
         </div>
-        <h2>Sterownik</h2>
-        <div class="row">
-          <label>Szerokość [mm]<input id="manualControllerW" type="number" min="1" step="1" value="90"></label>
-          <label>Wysokość [mm]<input id="manualControllerH" type="number" min="1" step="1" value="45"></label>
+      </section>
+
+      <section class="manual-settings-card manual-controller-settings-card">
+        <div class="manual-settings-card-heading">
+          <h2>Sterownik</h2>
+          <span>pozycja, obrót i rozmiar</span>
         </div>
-        <button id="manual-controller-add" class="secondary" type="button">Dodaj lub aktualizuj sterownik</button>
+        <div class="manual-controls">
+          <div class="row">
+            <label>Pozycja X [mm]<input id="manualControllerX" type="number" step="0.0001" value="0"></label>
+            <label>Pozycja Y [mm]<input id="manualControllerY" type="number" step="0.0001" value="0"></label>
+          </div>
+          <div class="row">
+            <label>Szerokość [mm]<input id="manualControllerW" type="number" min="1" step="0.0001" value="90"></label>
+            <label>Wysokość [mm]<input id="manualControllerH" type="number" min="1" step="0.0001" value="45"></label>
+          </div>
+          <label>Obrót [°]<input id="manualControllerRotation" type="number" step="0.001" value="0"></label>
+          <button id="manualControllerAspectLock" class="secondary active" type="button" aria-pressed="true">🔒 Proporcje sterownika</button>
+          <button id="manual-controller-add" class="secondary" type="button">Dodaj lub aktualizuj sterownik</button>
+        </div>
+      </section>
+
+      <div class="manual-controls manual-board-actions">
         <button id="manual-clear" class="secondary" type="button">Wyczyść planszę</button>
-        <p class="help"><strong style="color:var(--accent)">Ręczne malowanie:</strong> LPM dodaje ogniwo w najbliższym miejscu siatki, PPM je usuwa. Możesz malować dowolny układ.</p>
+        <p class="help"><strong style="color:var(--accent)">Ręczne malowanie:</strong> LPM dodaje ogniwo w najbliższym miejscu siatki, PPM je usuwa. Kliknij obiekt, aby go zaznaczyć; Ctrl+klik dodaje do zaznaczenia. Przeciągaj zaznaczenie, uchwyt obrotu lub uchwyty sterownika.</p>
       </div>
     </div>
   </aside>
@@ -289,7 +347,7 @@
     <div class="canvas-shell" id="boundaryCanvasShell">
       <svg id="drawing" role="img" aria-label="Wizualizacja pakietu baterii"></svg>
       <div id="manualTransformTools" class="manual-transform-tools" hidden>
-        <span>Przeciągnij osie X/Y lub okrąg · Ctrl+klik: zaznacz · Ctrl+A: wszystko</span>
+        <span>Przeciągnij zaznaczenie lub uchwyty · Ctrl+klik: wiele · Ctrl+A: wszystko</span>
       </div>
     </div>
     <div id="legend" hidden></div>
@@ -331,11 +389,11 @@
     <div id="stage2ConnectionWarnings" style="display:none"></div>
     <div class="stage1-electrical-panel" id="electricalCellControls">
       <div class="stage1-electrical-head">
-        <strong>Parametry wejściowe i charakterystyka pakietu</strong>
-        <span>wartości wejściowe i charakterystyka pakietu</span>
+        <strong>Charakterystyka pakietu</strong>
+        <span>parametry obliczone dla bieżącego układu</span>
       </div>
       <div class="stage1-parameter-columns">
-        <div class="stage1-parameter-column">
+        <div class="stage1-parameter-column" hidden aria-hidden="true">
           <strong class="stage1-column-title">Parametry elektryczne ogniwa</strong>
           <div class="stage1-electrical-inputs">
             <label>Pojemność nominalna [mAh]<input id="cellAh" type="number" min="1" step="1" value="5000" required></label>
@@ -348,7 +406,6 @@
           </div>
         </div>
         <div class="stage1-parameter-column stage1-pack-column">
-          <strong class="stage1-column-title">Charakterystyka pakietu</strong>
           <div id="stage1PackCharacteristics" class="stage1-pack-characteristics"></div>
         </div>
       </div>

@@ -145,9 +145,11 @@
     .manual-transform-tools button:hover { background: var(--accent); color: #0f172a; }
     .manual-transform-tools span { margin-left: 6px; color: var(--muted); font-size: 10px; white-space: nowrap; }
     .manual-gizmo { pointer-events: none; }
+    .manual-gizmo [data-manual-transform] { pointer-events: all; }
     .manual-gizmo-hit { pointer-events: stroke; cursor: grab; }
     .manual-gizmo-hit:active { cursor: grabbing; }
     .manual-gizmo-label { font-size: 8px; font-weight: 800; pointer-events: none; }
+    #manualCellSize[readonly] { opacity: .78; cursor: not-allowed; }
     svg {
       width: 100%; height: 100%; min-height: 0; display: block;
       background: linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
@@ -251,7 +253,23 @@
     .boundary-editor-tools button.active { outline: 2px solid var(--accent); }
 
     /* Manual mode */
-    #manualModePanel { display: none; }
+    #manualModePanel { display: none; gap: 12px; }
+    .manual-settings-card {
+      padding: 12px;
+      border: 1px solid rgba(148,163,184,.24);
+      border-radius: 10px;
+      background: rgba(15,23,42,.48);
+      box-shadow: inset 3px 0 0 rgba(20,184,166,.72);
+    }
+    .manual-settings-card h2,
+    .manual-settings-card h3 { margin: 0 0 10px; }
+    .manual-settings-card h3 { color: #cbd5e1; font-size: 12px; text-transform: uppercase; letter-spacing: .055em; }
+    .manual-settings-card-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .manual-settings-card-heading span { color: var(--muted); font-size: 10px; }
+    .manual-settings-card .manual-controls { margin-top: 0; }
+    .manual-cell-settings-card #stage1CellDefinitionControls > h2 { color: var(--accent); }
+    .manual-controller-settings-card { box-shadow: inset 3px 0 0 rgba(245,158,11,.82); }
+    .manual-board-actions { padding: 0 2px; }
     .manual-grid-hint {
       border: 1px dashed rgba(255,255,255,0.15); border-radius: 8px; padding: 14px;
       text-align: center; color: var(--muted); font-size: 13px; line-height: 1.5; margin-top: 8px;
@@ -337,6 +355,7 @@
     .stage1-electrical-head span { color: var(--muted); font-size: 10px; font-weight: 600; }
     .stage1-parameter-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
     .stage1-parameter-column { min-width: 0; }
+    .stage1-pack-column { grid-column: 1 / -1; }
     .stage1-column-title { display: block; margin-bottom: 6px; color: #cbd5e1; font-size: 11px; }
     .stage1-electrical-inputs { display: grid; grid-template-columns: repeat(4, minmax(90px, 1fr)); gap: 5px 7px; }
     .stage1-electrical-inputs label { margin: 0; gap: 3px; padding: 5px 6px; height: 45px; min-height: 45px; border: 1px solid rgba(148,163,184,.18); background: #0f172a; border-radius: 5px; font-size: 8px; line-height: 1.15; }

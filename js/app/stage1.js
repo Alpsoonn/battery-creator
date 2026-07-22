@@ -13,6 +13,63 @@
     svg.onpointerdown = e => beginWorkspacePan(e, svg);
   }
 
+  function automaticPlacementGridSvg(variant, cells, boundaryPointsList, radius) {
+    if (!cells.length) return "";
+    const pitch = readNumber("cellType") + readNumber("cellGap");
+    if (!Number.isFinite(pitch) || pitch <= 0) return "";
+    const layout = variant.layout === "square" ? "square" : "honeycomb";
+    const angle = (Number(variant.angle) || 0) * Math.PI / 180;
+    const rowStep = layout === "honeycomb" ? pitch * Math.sqrt(3) / 2 : pitch;
+    const anchoredCells = cells.filter(cell => Number.isInteger(cell.row) && Number.isInteger(cell.col));
+    if (!anchoredCells.length) return "";
+    const cos = Math.cos(angle), sin = Math.sin(angle);
+    const origin = anchoredCells.reduce((sum, cell) => {
+      const stagger = layout === "honeycomb" && cell.row % 2 !== 0 ? pitch / 2 : 0;
+      const localX = cell.col * pitch + stagger;
+      const localY = cell.row * rowStep;
+      sum.x += cell.x - (localX * cos - localY * sin);
+      sum.y += cell.y - (localX * sin + localY * cos);
+      return sum;
+    }, { x: 0, y: 0 });
+    origin.x /= anchoredCells.length;
+    origin.y /= anchoredCells.length;
+    const pointFor = (row, col) => {
+      const stagger = layout === "honeycomb" && row % 2 !== 0 ? pitch / 2 : 0;
+      const localX = col * pitch + stagger, localY = row * rowStep;
+      return { x: origin.x + localX * cos - localY * sin, y: origin.y + localX * sin + localY * cos };
+    };
+    const rows = anchoredCells.map(cell => cell.row), cols = anchoredCells.map(cell => cell.col);
+    const marginSlots = 7;
+    const minRow = Math.min(...rows) - marginSlots, maxRow = Math.max(...rows) + marginSlots;
+    const minCol = Math.min(...cols) - marginSlots, maxCol = Math.max(...cols) + marginSlots;
+    const extentPoints = [...cells, ...boundaryPointsList];
+    const xs = extentPoints.map(point => point.x), ys = extentPoints.map(point => point.y);
+    const pad = Math.max(80, pitch * 6);
+    const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad;
+    const minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
+    const occupied = new Map(anchoredCells.map(cell => [`${cell.row}:${cell.col}`, cell]));
+    let grid = "";
+    for (let row = minRow; row <= maxRow; row++) {
+      for (let col = minCol; col <= maxCol; col++) {
+        const point = pointFor(row, col);
+        if (point.x < minX || point.x > maxX || point.y < minY || point.y > maxY) continue;
+        let nearestDistance = Infinity;
+        for (let nearRow = row - 5; nearRow <= row + 5; nearRow++) {
+          for (let nearCol = col - 5; nearCol <= col + 5; nearCol++) {
+            const cell = occupied.get(`${nearRow}:${nearCol}`);
+            if (cell) nearestDistance = Math.min(nearestDistance, Math.hypot(cell.x - point.x, cell.y - point.y));
+          }
+        }
+        const proximity = Math.max(0, 1 - nearestDistance / (pitch * 4));
+        const strokeAlpha = (0.25 + proximity * 0.65).toFixed(2);
+        const strokeWidth = (0.8 + proximity * 0.7).toFixed(2);
+        grid += `<circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="${(radius * .88).toFixed(1)}" fill="none" stroke="rgba(226,232,240,${strokeAlpha})" stroke-width="${strokeWidth}" pointer-events="none"/>`;
+      }
+    }
+    const width = maxX - minX, height = maxY - minY;
+    return `<defs><radialGradient id="automaticGridFade"><stop offset="0" stop-color="#cbd5e1" stop-opacity=".78"/><stop offset=".52" stop-color="#94a3b8" stop-opacity=".42"/><stop offset=".82" stop-color="#64748b" stop-opacity=".16"/><stop offset="1" stop-color="#475569" stop-opacity="0"/></radialGradient><mask id="automaticGridMask" maskUnits="userSpaceOnUse" x="${minX}" y="${minY}" width="${width}" height="${height}"><rect x="${minX}" y="${minY}" width="${width}" height="${height}" fill="url(#automaticGridFade)"/></mask></defs><g mask="url(#automaticGridMask)" pointer-events="none">${grid}</g>`;
+  }
+
   function render(options = {}) {
     renderStage1PackCharacteristics();
     if (stage1Substep === 1) {
@@ -57,6 +114,7 @@
 
     const poly = tri.map(p => `${p.x},${p.y}`).join(" ");
     const labels = boundary.type === "triangle" ? sideLabels(boundary) : "";
+    const placementGrid = automaticPlacementGridSvg(variant, cells, tri, r);
 
     const overriddenCells = cells.map(c => ({ ...c }));
     if (!manualMode) {
@@ -155,6 +213,7 @@
           <path d="M 0 1 L 10 5 L 0 9 z" fill="#2563eb" />
         </marker>
       </defs>
+      ${placementGrid}
       <polygon points="${poly}" fill="transparent" stroke="var(--frame)" stroke-width="2.5" filter="url(#softShadow)"></polygon>
       ${controllerGuide}
       ${controller}
@@ -526,7 +585,8 @@
 
   function startManualMode() {
     if (!validateCellElectricalParameters()) return;
-    const variant = variants[activeIndex] || null;
+    const withoutEnclosure = boundaryType === "none" || placementBoundary?.type === "none";
+    const variant = withoutEnclosure ? null : (variants[activeIndex] || null);
     const sourceCells = variant && Array.isArray(variant.cells) ? variant.cells : [];
     manualMode = true;
     cellOverrides = {};
@@ -538,7 +598,7 @@
     manualVariant = variant ? {
       ...variant,
       cells: sourceCells.map(c => ({ ...c, section: null, parallelIndex: null }))
-    } : { triInfo: cloneBoundary(placementBoundary), controller: null, cells: [] };
+    } : { triInfo: withoutEnclosure ? null : cloneBoundary(placementBoundary), controller: null, cells: [] };
     manualGridStyle = variant?.layout || manualGridStyle;
     manualCellSize = readNumber("cellType") || manualCellSize;
     manualCellGap = readNumber("cellGap");
@@ -554,6 +614,8 @@
     } else {
       manualGridOrigin = { x: 0, y: 0 };
     }
+    const inferredGridOrigin = inferManualGridOrigin(sourceCells);
+    if (inferredGridOrigin) manualGridOrigin = inferredGridOrigin;
     const style = $("manualGridStyle");
     const size = $("manualCellSize");
     const gap = $("manualCellGap");
@@ -564,6 +626,7 @@
     if (gap) gap.value = manualCellGap;
     if (controllerW) controllerW.value = manualVariant.controller?.w || 90;
     if (controllerH) controllerH.value = manualVariant.controller?.h || 45;
+    syncManualControllerFields();
     $("manualTransformTools").hidden = false;
     resetManualHistory();
     updateNextBtn();
@@ -593,48 +656,194 @@
     return manualGridStyle === "honeycomb" ? pitch * Math.sqrt(3) / 2 : pitch;
   }
 
-  function nearestManualSlot(x, y) {
+  function closestManualSlot(x, y) {
     const pitch = manualCellSize + manualCellGap;
     const local = manualLocalPoint(x, y);
     const rowStep = manualGridRowStep();
     const rowEstimate = Math.round(local.y / rowStep);
     const colEstimate = Math.round(local.x / pitch);
     let best = null;
-    let distance = pitch * 0.72;
+    let distance = Infinity;
     for (let row = rowEstimate - 2; row <= rowEstimate + 2; row++) {
       for (let col = colEstimate - 2; col <= colEstimate + 2; col++) {
         const point = manualGridPoint(row, col);
         const d = Math.hypot(x - point.x, y - point.y);
-        if (d < distance) { distance = d; best = { row, col, ...point }; }
+        if (d < distance) { distance = d; best = { row, col, ...point, distance: d }; }
       }
     }
     return best;
   }
 
-  function manualGizmoSvg() {
+  function nearestManualSlot(x, y) {
+    const slot = closestManualSlot(x, y);
+    return slot && slot.distance <= (manualCellSize + manualCellGap) * 0.72 ? slot : null;
+  }
+
+  function manualCellGridSlot(cell) {
+    if (Number.isInteger(cell?.row) && Number.isInteger(cell?.col)) {
+      const point = manualGridPoint(cell.row, cell.col);
+      return { row: cell.row, col: cell.col, ...point };
+    }
+    return closestManualSlot(cell.x, cell.y);
+  }
+
+  function manualGridSlotKey(row, col) {
+    return `${row}:${col}`;
+  }
+
+  function manualSelectionCanOccupy(candidates, selectedIds) {
+    const occupied = new Set();
+    manualVariant.cells.forEach(cell => {
+      if (selectedIds.has(cell.id)) return;
+      const slot = manualCellGridSlot(cell);
+      if (slot) occupied.add(manualGridSlotKey(slot.row, slot.col));
+    });
+    const candidateKeys = new Set();
+    for (const candidate of candidates) {
+      const key = manualGridSlotKey(candidate.row, candidate.col);
+      if (occupied.has(key) || candidateKeys.has(key)) return false;
+      candidateKeys.add(key);
+    }
+    return true;
+  }
+
+  function inferManualGridOrigin(cells) {
+    const anchoredCells = (cells || []).filter(cell => Number.isInteger(cell.row) && Number.isInteger(cell.col));
+    if (!anchoredCells.length) return null;
+    const pitch = manualCellSize + manualCellGap;
+    const rowStep = manualGridStyle === "honeycomb" ? pitch * Math.sqrt(3) / 2 : pitch;
+    const cos = Math.cos(manualGridAngle), sin = Math.sin(manualGridAngle);
+    const total = anchoredCells.reduce((sum, cell) => {
+      const stagger = manualGridStyle === "honeycomb" && cell.row % 2 !== 0 ? pitch / 2 : 0;
+      const localX = cell.col * pitch + stagger;
+      const localY = cell.row * rowStep;
+      sum.x += cell.x - (localX * cos - localY * sin);
+      sum.y += cell.y - (localX * sin + localY * cos);
+      return sum;
+    }, { x: 0, y: 0 });
+    return { x: total.x / anchoredCells.length, y: total.y / anchoredCells.length };
+  }
+
+  function syncManualGridAttachedCells() {
+    if (!manualVariant?.cells) return;
+    manualVariant.cells.forEach(cell => {
+      if (!Number.isInteger(cell.row) || !Number.isInteger(cell.col)) return;
+      const point = manualGridPoint(cell.row, cell.col);
+      cell.x = point.x;
+      cell.y = point.y;
+    });
+  }
+
+  function syncManualCellGeometryFromProfile() {
+    const diameter = Math.max(5, readNumber("cellType") || 21);
+    if (Math.abs(diameter - manualCellSize) < 1e-9) {
+      if ($("manualCellSize")) $("manualCellSize").value = diameter;
+      return;
+    }
+    manualCellSize = diameter;
+    if ($("manualCellSize")) $("manualCellSize").value = diameter;
+    syncManualGridAttachedCells();
+  }
+
+  function syncManualControllerFields() {
+    const controller = manualVariant?.controller;
+    const values = {
+      manualControllerX: controller?.cx ?? manualGridOrigin.x,
+      manualControllerY: controller?.cy ?? manualGridOrigin.y,
+      manualControllerW: controller?.w ?? 90,
+      manualControllerH: controller?.h ?? 45,
+      manualControllerRotation: controller?.angle ?? 0
+    };
+    Object.entries(values).forEach(([id, value]) => {
+      const field = $(id);
+      if (field && document.activeElement !== field) field.value = String(Math.round(value * 10000) / 10000);
+    });
+    if (manualMode) {
+      if ($("controllerW")) $("controllerW").value = String(Math.round((controller?.w ?? 90) * 10000) / 10000);
+      if ($("controllerH")) $("controllerH").value = String(Math.round((controller?.h ?? 45) * 10000) / 10000);
+      if ($("controllerOn")) $("controllerOn").checked = Boolean(controller);
+    }
+    const aspect = $("manualControllerAspectLock");
+    if (aspect) {
+      aspect.textContent = manualControllerAspectLocked ? "🔒 Proporcje sterownika" : "🔓 Proporcje sterownika";
+      aspect.classList.toggle("active", manualControllerAspectLocked);
+      aspect.setAttribute("aria-pressed", String(manualControllerAspectLocked));
+    }
+  }
+
+  function beginManualControllerFieldEdit() {
+    if (manualVariant?.controller && !manualControllerFieldBefore) manualControllerFieldBefore = manualSnapshot();
+  }
+
+  function applyManualControllerField(id, rawValue) {
+    const controller = manualVariant?.controller;
+    const value = Number(rawValue);
+    if (!controller || !Number.isFinite(value)) return;
+    if (id === "manualControllerX") controller.cx = value;
+    else if (id === "manualControllerY") controller.cy = value;
+    else if (id === "manualControllerRotation") controller.angle = value;
+    else if (id === "manualControllerW") {
+      const ratio = controller.w / Math.max(1e-6, controller.h);
+      controller.w = boundaryClamp(value, 1, 10000);
+      if (manualControllerAspectLocked) controller.h = boundaryClamp(controller.w / ratio, 1, 10000);
+    } else if (id === "manualControllerH") {
+      const ratio = controller.w / Math.max(1e-6, controller.h);
+      controller.h = boundaryClamp(value, 1, 10000);
+      if (manualControllerAspectLocked) controller.w = boundaryClamp(controller.h * ratio, 1, 10000);
+    }
+    render();
+  }
+
+  function finishManualControllerFieldEdit() {
+    if (!manualControllerFieldBefore) return;
+    const before = manualControllerFieldBefore;
+    manualControllerFieldBefore = null;
+    commitManualHistory(before);
+  }
+
+  function manualSelectionDescriptor() {
     const cells = manualSelectionCells();
-    const controller = manualControllerSelected && manualVariant ? manualVariant.controller : null;
-    const pivot = manualSelectionPivot(cells, controller);
-    if (!pivot) return "";
-    const size = Math.max(18, (manualCellSize + manualCellGap) * 2.2);
-    const rotateRadius = size * .78;
-    return `<defs>
-      <marker id="manualGizmoArrowX" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#f87171"/></marker>
-      <marker id="manualGizmoArrowY" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#60a5fa"/></marker>
-    </defs>
-    <g class="manual-gizmo" data-manual-gizmo="true">
-      <line class="manual-gizmo-hit" data-gizmo-action="move-x" x1="${pivot.x}" y1="${pivot.y}" x2="${pivot.x + size}" y2="${pivot.y}" stroke="#f87171" stroke-width="3" marker-end="url(#manualGizmoArrowX)"/>
-      <line class="manual-gizmo-hit" data-gizmo-action="move-y" x1="${pivot.x}" y1="${pivot.y}" x2="${pivot.x}" y2="${pivot.y - size}" stroke="#60a5fa" stroke-width="3" marker-end="url(#manualGizmoArrowY)"/>
-      <circle class="manual-gizmo-hit" data-gizmo-action="rotate" cx="${pivot.x}" cy="${pivot.y}" r="${rotateRadius}" fill="none" stroke="#fbbf24" stroke-width="3" stroke-dasharray="5 3"/>
-      <text class="manual-gizmo-label" x="${pivot.x + size + 4}" y="${pivot.y + 3}" fill="#f87171">X</text>
-      <text class="manual-gizmo-label" x="${pivot.x + 3}" y="${pivot.y - size - 4}" fill="#60a5fa">Y</text>
-      <text class="manual-gizmo-label" x="${pivot.x + rotateRadius + 4}" y="${pivot.y - 4}" fill="#fbbf24">obrót</text>
+    const controller = manualControllerSelected ? manualVariant?.controller : null;
+    if (!cells.length && !controller) return null;
+    if (controller && !cells.length) {
+      return { kind: "controller", cells, controller, cx: controller.cx, cy: controller.cy, width: controller.w, height: controller.h, angle: controller.angle || 0 };
+    }
+    const radius = manualCellSize / 2;
+    const points = cells.flatMap(cell => [{ x: cell.x - radius, y: cell.y - radius }, { x: cell.x + radius, y: cell.y + radius }]);
+    if (controller) points.push(...rotatedRectCorners(controller));
+    const bounds = polygonBounds(points);
+    return { kind: controller ? "combined" : "cells", cells, controller, cx: (bounds.minX + bounds.maxX) / 2, cy: (bounds.minY + bounds.maxY) / 2, width: Math.max(1, bounds.maxX - bounds.minX), height: Math.max(1, bounds.maxY - bounds.minY), angle: 0 };
+  }
+
+  function manualGizmoSvg() {
+    const descriptor = manualSelectionDescriptor();
+    if (!descriptor) return "";
+    const unit = boundaryImageScreenUnit();
+    const handleSize = 9 * unit, hitSize = 22 * unit, rotateOffset = 28 * unit;
+    const width = descriptor.width, height = descriptor.height;
+    const positions = [
+      [-width / 2, -height / 2, "nw"], [0, -height / 2, "n"], [width / 2, -height / 2, "ne"],
+      [width / 2, 0, "e"], [width / 2, height / 2, "se"], [0, height / 2, "s"],
+      [-width / 2, height / 2, "sw"], [-width / 2, 0, "w"]
+    ];
+    const cursors = { nw: "nwse-resize", n: "ns-resize", ne: "nesw-resize", e: "ew-resize", se: "nwse-resize", s: "ns-resize", sw: "nesw-resize", w: "ew-resize" };
+    const scaleHandles = descriptor.kind === "controller" ? positions.map(([x, y, handle]) => `<g data-manual-transform="scale" data-manual-handle="${handle}" style="cursor:${cursors[handle]}"><circle cx="${x}" cy="${y}" r="${hitSize / 2}" fill="transparent" pointer-events="all"/><rect x="${x - handleSize / 2}" y="${y - handleSize / 2}" width="${handleSize}" height="${handleSize}" rx="${1.5 * unit}" fill="#f8fafc" stroke="#2563eb" stroke-width="${1.5 * unit}" pointer-events="none"/></g>`).join("") : "";
+    const allCellsSelected = descriptor.cells.length > 0 && descriptor.cells.length === manualVariant.cells.length;
+    const rotationHandle = descriptor.cells.length === 0 || allCellsSelected
+      ? `<g data-manual-transform="rotate" style="cursor:grab"><line x1="0" y1="${-height / 2}" x2="0" y2="${-height / 2 - rotateOffset}" stroke="#60a5fa" stroke-width="${1.5 * unit}" pointer-events="none"/><circle cx="0" cy="${-height / 2 - rotateOffset}" r="${hitSize / 2}" fill="transparent" pointer-events="all"/><circle cx="0" cy="${-height / 2 - rotateOffset}" r="${handleSize / 2}" fill="#f59e0b" stroke="#fff" stroke-width="${1.5 * unit}" pointer-events="none"/></g>`
+      : "";
+    return `<g class="manual-gizmo" data-manual-gizmo="true" transform="translate(${descriptor.cx} ${descriptor.cy}) rotate(${descriptor.angle})">
+      <rect x="${-width / 2}" y="${-height / 2}" width="${width}" height="${height}" fill="none" stroke="#60a5fa" stroke-width="${1.5 * unit}" pointer-events="none"/>
+      ${rotationHandle}
+      ${scaleHandles}
     </g>`;
   }
 
   function renderManualBoard(svg) {
+    syncManualCellGeometryFromProfile();
     const cells = manualVariant ? manualVariant.cells : [];
-    const tri = manualVariant && manualVariant.triInfo ? boundaryPoints(manualVariant.triInfo) : null;
+    const boundary = manualVariant?.triInfo ? boundaryPoints(manualVariant.triInfo) : [];
+    const tri = boundary.length >= 3 ? boundary : null;
     const controller = manualVariant && manualVariant.controller ? manualVariant.controller : null;
     const pitch = manualCellSize + manualCellGap;
     const radius = manualCellSize / 2;
@@ -660,33 +869,58 @@
         const strokeAlpha = (0.25 + proximity * 0.65).toFixed(2);
         const stroke = `rgba(226,232,240,${strokeAlpha})`;
         const strokeWidth = (0.8 + proximity * 0.7).toFixed(2);
-        grid += manualGridStyle === "honeycomb"
-          ? `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${(radius * .88).toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}"/>`
-          : `<rect x="${(p.x - radius * .88).toFixed(1)}" y="${(p.y - radius * .88).toFixed(1)}" width="${(radius * 1.76).toFixed(1)}" height="${(radius * 1.76).toFixed(1)}" rx="2" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+        grid += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${(radius * .88).toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
       }
     }
     const frame = tri ? `<polygon points="${tri.map(p => `${p.x},${p.y}`).join(" ")}" fill="rgba(20,184,166,.025)" stroke="var(--frame)" stroke-width="2.5"/>` : "";
     const cellSvg = cells.map(c => {
       const selected = manualSelectedCellIds.has(c.id);
-      return `<g class="manual-cell" data-cid="${c.id}" style="cursor:pointer"><circle cx="${c.x.toFixed(2)}" cy="${c.y.toFixed(2)}" r="${radius.toFixed(2)}" fill="#d8dee8" stroke="${selected ? "#f59e0b" : "var(--cell-stroke)"}" stroke-width="${selected ? "2.2" : ".9"}"/></g>`;
+      return `<g class="manual-cell" data-cid="${c.id}" style="cursor:${selected ? "grab" : "pointer"}"><circle cx="${c.x.toFixed(2)}" cy="${c.y.toFixed(2)}" r="${radius.toFixed(2)}" fill="#d8dee8" stroke="${selected ? "#f59e0b" : "var(--cell-stroke)"}" stroke-width="${selected ? "2.2" : ".9"}"/></g>`;
     }).join("");
-    const controllerSvg = controller ? `<g class="manual-controller" data-controller="true" style="cursor:pointer"><polygon points="${rotatedRectCorners(controller).map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ")}" fill="${manualControllerSelected ? "rgba(245,158,11,.32)" : "#ffe8b3"}" stroke="${manualControllerSelected ? "#f59e0b" : "#9a6700"}" stroke-width="${manualControllerSelected ? "3" : "2"}"/><text x="${controller.cx.toFixed(2)}" y="${(controller.cy + 4).toFixed(2)}" text-anchor="middle" font-size="11" font-weight="800" fill="#694600" transform="rotate(${(controller.angle || 0).toFixed(2)} ${controller.cx.toFixed(2)} ${controller.cy.toFixed(2)})">sterownik</text></g>` : "";
+    const controllerSvg = controller ? `<g class="manual-controller" data-controller="true" style="cursor:move"><polygon points="${rotatedRectCorners(controller).map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ")}" fill="${manualControllerSelected ? "rgba(245,158,11,.32)" : "#ffe8b3"}" stroke="${manualControllerSelected ? "#f59e0b" : "#9a6700"}" stroke-width="${manualControllerSelected ? "3" : "2"}"/><text x="${controller.cx.toFixed(2)}" y="${(controller.cy + 4).toFixed(2)}" text-anchor="middle" font-size="11" font-weight="800" fill="#694600" transform="rotate(${(controller.angle || 0).toFixed(2)} ${controller.cx.toFixed(2)} ${controller.cy.toFixed(2)})" pointer-events="none">sterownik</text></g>` : "";
     svg.innerHTML = `<defs><radialGradient id="manualGridFade"><stop offset="0" stop-color="#cbd5e1" stop-opacity=".78"/><stop offset=".52" stop-color="#94a3b8" stop-opacity=".42"/><stop offset=".82" stop-color="#64748b" stop-opacity=".16"/><stop offset="1" stop-color="#475569" stop-opacity="0"/></radialGradient><mask id="manualGridMask" maskUnits="userSpaceOnUse" x="${minX}" y="${minY}" width="${width}" height="${height}"><rect x="${minX}" y="${minY}" width="${width}" height="${height}" fill="url(#manualGridFade)"/></mask></defs><g mask="url(#manualGridMask)">${grid}</g>${frame}${controllerSvg}${cellSvg}${manualGizmoSvg()}`;
     svg.onwheel = e => zoomWorkspace(e, svg);
-    svg.onpointerdown = e => { if (!beginWorkspacePan(e, svg)) beginManualGizmoDrag(e, svg); };
+    svg.onpointerdown = e => {
+      if (beginWorkspacePan(e, svg)) return;
+      if (beginManualGizmoDrag(e, svg)) return;
+      beginManualCellPaint(e, svg);
+    };
+    syncManualControllerFields();
     $("status").className = "status";
-    $("status").innerHTML = `<strong style="color:var(--accent)">Tryb ręcznego malowania</strong><br/><span style="font-size:11px;opacity:.85">LPM – dodaj ogniwo · PPM – usuń ogniwo · ${cells.length} ogniw na planszy</span>`;
+    const enclosureStatus = tri ? "granica aktywna" : "bez obudowy — pusta plansza";
+    $("status").innerHTML = `<strong style="color:var(--accent)">Tryb ręcznego malowania</strong> · ${enclosureStatus}<br/><span style="font-size:11px;opacity:.85">LPM – zaznacz/dodaj · przytrzymaj LPM – maluj · przytrzymaj PPM – usuwaj · przeciągnij zaznaczone ogniwo – wolne miejsce siatki · 2×LPM – zaznacz wszystkie · ${cells.length} ogniw</span>`;
     $("progressBar").style.width = "0";
+    updateNextBtn();
     svg.onclick = e => {
       if (e.button === 2) return;
+      if (manualSuppressNextClick) {
+        manualSuppressNextClick = false;
+        return;
+      }
       if (workspacePan?.moved || workspacePanJustMoved) { workspacePan = null; workspacePanJustMoved = false; return; }
+      if (manualClickSuppressed) return;
       if (e.target.closest("[data-manual-gizmo]")) return;
       const target = e.target.closest(".manual-cell, .manual-controller");
+      if (!target || target.dataset.controller) {
+        manualLastCellClickId = null;
+        manualLastCellClickAt = 0;
+      }
       if (e.ctrlKey && target) {
         if (target.dataset.controller) manualControllerSelected = !manualControllerSelected;
         else {
-          const id = Number(target.dataset.cid);
+          const id = manualCellIdFromElement(target);
           if (manualSelectedCellIds.has(id)) manualSelectedCellIds.delete(id); else manualSelectedCellIds.add(id);
+        }
+        render();
+        return;
+      }
+      if (target) {
+        if (target.dataset.controller) {
+          manualSelectedCellIds.clear();
+          manualControllerSelected = true;
+        } else {
+          manualSelectedCellIds = new Set([manualCellIdFromElement(target)]);
+          manualControllerSelected = false;
         }
         render();
         return;
@@ -697,20 +931,22 @@
         render();
         return;
       }
-      if (target && target.classList.contains("manual-cell")) return;
-      if (target && target.classList.contains("manual-controller")) return;
       const point = svgPoint(e, svg), slot = nearestManualSlot(point.x, point.y);
       if (!slot) return;
       const exists = cells.findIndex(c => c.row === slot.row && c.col === slot.col);
       if (exists >= 0) return;
       const before = manualSnapshot();
-      cells.push({ id: Date.now() + Math.random(), row: slot.row, col: slot.col, x: slot.x, y: slot.y, section: null, parallelIndex: null });
+      cells.push({ id: nextCustomCellId(), custom: true, row: slot.row, col: slot.col, x: slot.x, y: slot.y, section: null, parallelIndex: null });
       commitManualHistory(before);
       render();
     };
     svg.oncontextmenu = e => {
       e.preventDefault();
-      if (e.target.closest("[data-manual-gizmo]")) return;
+      if (manualSuppressNextContextMenu) {
+        manualSuppressNextContextMenu = false;
+        return;
+      }
+      if (e.target.closest("[data-manual-transform]")) return;
       if (e.target.closest(".manual-controller")) return;
       const point = svgPoint(e, svg);
       let index = cells.findIndex(c => Math.hypot(c.x - point.x, c.y - point.y) <= radius * 1.3);
@@ -736,79 +972,374 @@
     return Math.round(value * 1000) / 1000;
   }
 
+  function manualCellIdFromElement(element) {
+    const rawId = String(element?.dataset?.cid ?? "");
+    return manualVariant?.cells.find(cell => String(cell.id) === rawId)?.id ?? rawId;
+  }
+
+  function applyManualCellPaintAtPoint(point) {
+    if (!manualVariant?.cells) return false;
+    const slot = nearestManualSlot(point.x, point.y);
+    if (!slot) return false;
+    const key = manualGridSlotKey(slot.row, slot.col);
+    if (manualCellPaint?.visitedSlots.has(key)) return false;
+    manualCellPaint?.visitedSlots.add(key);
+    const occupiedIndex = manualVariant.cells.findIndex(cell => {
+      const occupied = manualCellGridSlot(cell);
+      return occupied && occupied.row === slot.row && occupied.col === slot.col;
+    });
+    if (manualCellPaint?.mode === "erase") {
+      if (occupiedIndex < 0) return false;
+      const [removed] = manualVariant.cells.splice(occupiedIndex, 1);
+      manualSelectedCellIds.delete(removed.id);
+      return true;
+    }
+    if (occupiedIndex >= 0) return false;
+    manualVariant.cells.push({ id: nextCustomCellId(), custom: true, row: slot.row, col: slot.col, x: slot.x, y: slot.y, section: null, parallelIndex: null });
+    return true;
+  }
+
+  function beginManualCellPaint(e, svg) {
+    if (!manualMode || !manualVariant || ![0, 2].includes(e.button) || e.ctrlKey || spacePressed) return false;
+    const erase = e.button === 2;
+    if (e.target.closest(".manual-controller, [data-manual-gizmo]")) return false;
+    if (!erase && e.target.closest(".manual-cell")) return false;
+    if (!erase && (manualSelectedCellIds.size || manualControllerSelected)) return false;
+    const point = svgPoint(e, svg);
+    manualCellPaint = {
+      pointerId: e.pointerId,
+      mode: erase ? "erase" : "add",
+      before: manualSnapshot(),
+      lastPoint: point,
+      visitedSlots: new Set(),
+      changed: false
+    };
+    e.preventDefault();
+    svg.setPointerCapture?.(e.pointerId);
+    if (erase) {
+      manualSuppressNextContextMenu = true;
+      setTimeout(() => { manualSuppressNextContextMenu = false; }, 250);
+    }
+    manualSelectedCellIds.clear();
+    manualControllerSelected = false;
+    manualCellPaint.changed = applyManualCellPaintAtPoint(point);
+    if (!manualCellPaint.changed && !erase) {
+      if (svg.hasPointerCapture?.(e.pointerId)) svg.releasePointerCapture(e.pointerId);
+      manualCellPaint = null;
+      return false;
+    }
+    render();
+    return true;
+  }
+
+  function applyManualCellPaintPointer(e) {
+    if (!manualCellPaint || !manualVariant || e.pointerId !== manualCellPaint.pointerId) return;
+    const svg = $("drawing");
+    const current = svgPoint(e, svg);
+    const previous = manualCellPaint.lastPoint;
+    const pitch = Math.max(1, manualCellSize + manualCellGap);
+    const distance = Math.hypot(current.x - previous.x, current.y - previous.y);
+    const steps = Math.max(1, Math.ceil(distance / (pitch * .3)));
+    let added = false;
+    for (let index = 1; index <= steps; index++) {
+      const ratio = index / steps;
+      added = applyManualCellPaintAtPoint({
+        x: previous.x + (current.x - previous.x) * ratio,
+        y: previous.y + (current.y - previous.y) * ratio
+      }) || added;
+    }
+    manualCellPaint.lastPoint = current;
+    manualCellPaint.changed = manualCellPaint.changed || added;
+    if (added) render();
+  }
+
+  function updateManualCellPaint(e) {
+    if (!manualCellPaint || e.pointerId !== manualCellPaint.pointerId) return;
+    manualCellPaintPendingPointer = { pointerId: e.pointerId, clientX: e.clientX, clientY: e.clientY };
+    if (manualCellPaintFrame !== null) return;
+    manualCellPaintFrame = requestAnimationFrame(() => {
+      manualCellPaintFrame = null;
+      const pointer = manualCellPaintPendingPointer;
+      manualCellPaintPendingPointer = null;
+      if (pointer) applyManualCellPaintPointer(pointer);
+    });
+  }
+
+  function finishManualCellPaint(e) {
+    if (!manualCellPaint || (e?.pointerId !== undefined && e.pointerId !== manualCellPaint.pointerId)) return false;
+    const paint = manualCellPaint;
+    if (manualCellPaintFrame !== null) cancelAnimationFrame(manualCellPaintFrame);
+    manualCellPaintFrame = null;
+    if (manualCellPaintPendingPointer) applyManualCellPaintPointer(manualCellPaintPendingPointer);
+    manualCellPaintPendingPointer = null;
+    const svg = $("drawing");
+    const pointerId = e?.pointerId ?? paint.pointerId;
+    if (svg?.hasPointerCapture?.(pointerId)) svg.releasePointerCapture(pointerId);
+    manualCellPaint = null;
+    if (paint.changed) commitManualHistory(paint.before);
+    manualSuppressNextClick = true;
+    setTimeout(() => { manualSuppressNextClick = false; }, 0);
+    updateNextBtn();
+    return true;
+  }
+
   function beginManualGizmoDrag(e, svg) {
-    const handle = e.target.closest("[data-gizmo-action]");
-    if (!handle || !manualMode || !manualVariant) return;
+    if (!manualMode || !manualVariant || e.button !== 0) return false;
+    const handle = e.target.closest("[data-manual-transform]");
+    const target = e.target.closest(".manual-cell, .manual-controller");
+    if (!handle && !target) return false;
+    if (e.ctrlKey && target && !handle) return false;
+    if (!handle && target?.classList.contains("manual-cell")) {
+      const clickedId = manualCellIdFromElement(target);
+      const now = performance.now();
+      const secondClickInTime = manualLastCellClickId === clickedId && now - manualLastCellClickAt <= 500;
+      if (!secondClickInTime) {
+        manualLastCellClickId = clickedId;
+        manualLastCellClickAt = now;
+      }
+      target.dataset.manualSelectAllCandidate = secondClickInTime ? "true" : "false";
+    }
+    if (!handle && target?.classList.contains("manual-cell") && !manualSelectedCellIds.has(manualCellIdFromElement(target))) return false;
     e.preventDefault();
     e.stopPropagation();
+    let selectionChanged = false;
+    if (!handle && target?.dataset.controller && !manualControllerSelected) {
+      manualSelectedCellIds.clear();
+      manualControllerSelected = true;
+      selectionChanged = true;
+    } else if (!handle && target?.classList.contains("manual-cell")) {
+      const id = manualCellIdFromElement(target);
+      if (!manualSelectedCellIds.has(id)) {
+        manualSelectedCellIds = new Set([id]);
+        manualControllerSelected = false;
+        selectionChanged = true;
+      }
+    }
     const cells = manualSelectionCells();
     const controller = manualControllerSelected && manualVariant.controller ? { ...manualVariant.controller } : null;
-    const pivot = manualSelectionPivot(cells, controller);
-    if (!pivot) return;
+    const descriptor = manualSelectionDescriptor();
+    const pivot = descriptor ? { x: descriptor.cx, y: descriptor.cy } : manualSelectionPivot(cells, controller);
+    if (!pivot) return false;
     const point = svgPoint(e, svg);
+    svg.setPointerCapture?.(e.pointerId);
     manualDrag = {
       before: manualSnapshot(),
-      action: handle.dataset.gizmoAction,
+      mode: handle?.dataset.manualTransform || "pending-move",
+      pointerId: e.pointerId,
+      activeHandle: handle?.dataset.manualHandle || null,
       pivot,
       startPoint: point,
+      startClient: { x: e.clientX, y: e.clientY },
       startAngle: Math.atan2(point.y - pivot.y, point.x - pivot.x),
-      cells: cells.map(c => ({ id: c.id, x: c.x, y: c.y, row: c.row, col: c.col })),
+      cells: cells.map(c => {
+        const slot = manualCellGridSlot(c);
+        return { id: c.id, x: c.x, y: c.y, row: slot?.row ?? c.row, col: slot?.col ?? c.col };
+      }),
       controller,
       origin: { ...manualGridOrigin },
       gridAngle: manualGridAngle,
-      allCellsSelected: cells.length === manualVariant.cells.length && cells.length > 0
+      allCellsSelected: cells.length === manualVariant.cells.length && cells.length > 0,
+      selectAllOnClick: target?.dataset.manualSelectAllCandidate === "true",
+      pointerMoved: false,
+      moved: false
     };
+    if (selectionChanged) render();
+    return true;
   }
 
-  function updateManualGizmoDrag(e) {
-    if (!manualDrag || !manualVariant) return;
+  function applyManualTransformPointer(e) {
+    if (!manualDrag || !manualVariant || e.pointerId !== manualDrag.pointerId) return;
     const drag = manualDrag;
     const svg = $("drawing");
     const point = svgPoint(e, svg);
     let dx = point.x - drag.startPoint.x;
     let dy = point.y - drag.startPoint.y;
     const cellsById = new Map(manualVariant.cells.map(c => [c.id, c]));
-    if (drag.action === "move-x" || drag.action === "move-y") {
-      if (drag.action === "move-x") dy = 0; else dx = 0;
+    if (drag.mode === "pending-move") {
+      if (Math.hypot(e.clientX - drag.startClient.x, e.clientY - drag.startClient.y) < 4) return;
+      drag.mode = "move";
+      drag.pointerMoved = true;
+      drag.selectAllOnClick = false;
+      manualLastCellClickId = null;
+      manualLastCellClickAt = 0;
+    }
+    if (drag.mode === "move") {
       dx = roundManualMillimetres(dx); dy = roundManualMillimetres(dy);
-      drag.cells.forEach(snapshot => {
-        const cell = cellsById.get(snapshot.id);
-        if (!cell) return;
-        cell.x = snapshot.x + dx; cell.y = snapshot.y + dy;
-        if (!drag.allCellsSelected) { cell.row = null; cell.col = null; }
-      });
-      if (drag.controller && manualVariant.controller) {
-        manualVariant.controller.cx = drag.controller.cx + dx;
-        manualVariant.controller.cy = drag.controller.cy + dy;
+      if (drag.cells.length && !drag.allCellsSelected) {
+        const anchor = drag.cells[0];
+        const targetSlot = closestManualSlot(anchor.x + dx, anchor.y + dy);
+        if (!targetSlot || !Number.isInteger(anchor.row) || !Number.isInteger(anchor.col)) return;
+        const rowDelta = targetSlot.row - anchor.row;
+        const colDelta = targetSlot.col - anchor.col;
+        const candidates = drag.cells.map(snapshot => {
+          const row = snapshot.row + rowDelta, col = snapshot.col + colDelta;
+          return { snapshot, row, col, point: manualGridPoint(row, col) };
+        });
+        const selectedIds = new Set(drag.cells.map(cell => cell.id));
+        if (!manualSelectionCanOccupy(candidates, selectedIds)) return;
+        candidates.forEach(({ snapshot, row, col, point }) => {
+          const cell = cellsById.get(snapshot.id);
+          if (!cell) return;
+          Object.assign(cell, { x: point.x, y: point.y, row, col });
+        });
+        const snappedDx = targetSlot.x - anchor.x, snappedDy = targetSlot.y - anchor.y;
+        if (drag.controller && manualVariant.controller) {
+          manualVariant.controller.cx = drag.controller.cx + snappedDx;
+          manualVariant.controller.cy = drag.controller.cy + snappedDy;
+        }
+      } else {
+        if (drag.allCellsSelected) {
+          manualGridOrigin.x = drag.origin.x + dx;
+          manualGridOrigin.y = drag.origin.y + dy;
+        }
+        drag.cells.forEach(snapshot => {
+          const cell = cellsById.get(snapshot.id);
+          if (!cell) return;
+          if (Number.isInteger(snapshot.row) && Number.isInteger(snapshot.col)) {
+            const point = manualGridPoint(snapshot.row, snapshot.col);
+            Object.assign(cell, { x: point.x, y: point.y, row: snapshot.row, col: snapshot.col });
+          } else {
+            cell.x = snapshot.x + dx;
+            cell.y = snapshot.y + dy;
+          }
+        });
+        if (drag.controller && manualVariant.controller) {
+          manualVariant.controller.cx = drag.controller.cx + dx;
+          manualVariant.controller.cy = drag.controller.cy + dy;
+        }
       }
-      if (drag.allCellsSelected) {
-        manualGridOrigin.x = drag.origin.x + dx;
-        manualGridOrigin.y = drag.origin.y + dy;
-      }
-    } else if (drag.action === "rotate") {
+      drag.moved = true;
+    } else if (drag.mode === "rotate") {
       const currentAngle = Math.atan2(point.y - drag.pivot.y, point.x - drag.pivot.x);
-      const degrees = roundManualMillimetres((currentAngle - drag.startAngle) * 180 / Math.PI);
+      let degrees = (currentAngle - drag.startAngle) * 180 / Math.PI;
+      if (e.shiftKey) degrees = Math.round(((drag.controller?.angle || 0) + degrees) / 15) * 15 - (drag.controller?.angle || 0);
+      degrees = roundManualMillimetres(degrees);
       const angle = degrees * Math.PI / 180;
-      drag.cells.forEach(snapshot => {
-        const cell = cellsById.get(snapshot.id);
-        if (!cell) return;
-        const rotated = rotateManualPoint(snapshot, drag.pivot, angle);
-        cell.x = roundManualMillimetres(rotated.x); cell.y = roundManualMillimetres(rotated.y);
-        if (!drag.allCellsSelected) { cell.row = null; cell.col = null; }
-      });
+      if (drag.allCellsSelected) {
+        const rotatedOrigin = rotateManualPoint(drag.origin, drag.pivot, angle);
+        manualGridOrigin = { x: roundManualMillimetres(rotatedOrigin.x), y: roundManualMillimetres(rotatedOrigin.y) };
+        manualGridAngle = drag.gridAngle + angle;
+        drag.cells.forEach(snapshot => {
+          const cell = cellsById.get(snapshot.id);
+          if (!cell || !Number.isInteger(snapshot.row) || !Number.isInteger(snapshot.col)) return;
+          const point = manualGridPoint(snapshot.row, snapshot.col);
+          Object.assign(cell, { x: roundManualMillimetres(point.x), y: roundManualMillimetres(point.y), row: snapshot.row, col: snapshot.col });
+        });
+      }
       if (drag.controller && manualVariant.controller) {
         const rotated = rotateManualPoint({ x: drag.controller.cx, y: drag.controller.cy }, drag.pivot, angle);
         manualVariant.controller.cx = roundManualMillimetres(rotated.x);
         manualVariant.controller.cy = roundManualMillimetres(rotated.y);
         manualVariant.controller.angle = roundManualMillimetres((drag.controller.angle || 0) + degrees);
       }
-      if (drag.allCellsSelected) {
-        const rotatedOrigin = rotateManualPoint(drag.origin, drag.pivot, angle);
-        manualGridOrigin = { x: roundManualMillimetres(rotatedOrigin.x), y: roundManualMillimetres(rotatedOrigin.y) };
-        manualGridAngle = drag.gridAngle + angle;
+      drag.moved = true;
+    } else if (drag.mode === "scale" && drag.controller && manualVariant.controller && drag.cells.length === 0) {
+      const start = drag.controller, handle = drag.activeHandle || "se";
+      const signX = handle.includes("e") ? 1 : handle.includes("w") ? -1 : 0;
+      const signY = handle.includes("s") ? 1 : handle.includes("n") ? -1 : 0;
+      const angle = start.angle || 0;
+      let width = start.w, height = start.h, center = { x: start.cx, y: start.cy };
+      if (e.altKey) {
+        const local = boundaryInverseRotateVector({ x: point.x - center.x, y: point.y - center.y }, angle);
+        if (signX) width = signX * local.x * 2;
+        if (signY) height = signY * local.y * 2;
+      } else {
+        const anchorLocal = { x: signX ? -signX * start.w / 2 : 0, y: signY ? -signY * start.h / 2 : 0 };
+        const anchorOffset = boundaryRotateVector(anchorLocal, angle);
+        const anchor = { x: start.cx + anchorOffset.x, y: start.cy + anchorOffset.y };
+        const local = boundaryInverseRotateVector({ x: point.x - anchor.x, y: point.y - anchor.y }, angle);
+        if (signX) width = signX * local.x;
+        if (signY) height = signY * local.y;
       }
+      width = boundaryClamp(width, 1, 10000);
+      height = boundaryClamp(height, 1, 10000);
+      const preserveAspect = manualControllerAspectLocked ? !e.shiftKey : e.shiftKey;
+      if (preserveAspect) {
+        let scale = 1;
+        if (signX && signY) {
+          const widthScale = width / start.w, heightScale = height / start.h;
+          scale = Math.abs(widthScale - 1) >= Math.abs(heightScale - 1) ? widthScale : heightScale;
+        } else if (signX) scale = width / start.w;
+        else if (signY) scale = height / start.h;
+        width = boundaryClamp(start.w * scale, 1, 10000);
+        height = boundaryClamp(start.h * scale, 1, 10000);
+      }
+      if (!e.altKey) {
+        const anchorLocal = { x: signX ? -signX * start.w / 2 : 0, y: signY ? -signY * start.h / 2 : 0 };
+        const anchorOffset = boundaryRotateVector(anchorLocal, angle);
+        const anchor = { x: start.cx + anchorOffset.x, y: start.cy + anchorOffset.y };
+        const centerOffset = boundaryRotateVector({ x: signX ? signX * width / 2 : 0, y: signY ? signY * height / 2 : 0 }, angle);
+        center = { x: anchor.x + centerOffset.x, y: anchor.y + centerOffset.y };
+      }
+      Object.assign(manualVariant.controller, { cx: roundManualMillimetres(center.x), cy: roundManualMillimetres(center.y), w: roundManualMillimetres(width), h: roundManualMillimetres(height) });
+      drag.moved = true;
     }
     render();
+  }
+
+  function updateManualGizmoDrag(e) {
+    if (!manualDrag || e.pointerId !== manualDrag.pointerId) return;
+    manualPendingPointer = { pointerId: e.pointerId, clientX: e.clientX, clientY: e.clientY, shiftKey: e.shiftKey, altKey: e.altKey };
+    if (manualPointerFrame !== null) return;
+    manualPointerFrame = requestAnimationFrame(() => {
+      manualPointerFrame = null;
+      const pointer = manualPendingPointer;
+      manualPendingPointer = null;
+      if (pointer) applyManualTransformPointer(pointer);
+    });
+  }
+
+  function finishManualTransformInteraction(e) {
+    if (!manualDrag || (e?.pointerId !== undefined && e.pointerId !== manualDrag.pointerId)) return;
+    const drag = manualDrag;
+    if (manualPointerFrame !== null) cancelAnimationFrame(manualPointerFrame);
+    manualPointerFrame = null;
+    if (manualPendingPointer) applyManualTransformPointer(manualPendingPointer);
+    manualPendingPointer = null;
+    const svg = $("drawing");
+    if (e?.pointerId !== undefined && svg?.hasPointerCapture?.(e.pointerId)) svg.releasePointerCapture(e.pointerId);
+    manualDrag = null;
+    if (drag.selectAllOnClick && !drag.pointerMoved) {
+      manualLastCellClickId = null;
+      manualLastCellClickAt = 0;
+      manualSuppressNextClick = true;
+      manualSelectedCellIds = new Set(manualVariant.cells.map(cell => cell.id));
+      manualControllerSelected = false;
+      render();
+      return;
+    }
+    if (drag.moved) {
+      commitManualHistory(drag.before);
+    }
+    if (drag.moved || drag.pointerMoved) {
+      manualLastCellClickId = null;
+      manualLastCellClickAt = 0;
+      manualClickSuppressed = true;
+      setTimeout(() => { manualClickSuppressed = false; }, 0);
+    } else {
+      manualClickSuppressed = false;
+    }
+    syncManualControllerFields();
+  }
+
+  function cancelManualTransformInteraction() {
+    if (!manualDrag || !manualVariant) return false;
+    const drag = manualDrag, cellsById = new Map(manualVariant.cells.map(cell => [cell.id, cell]));
+    drag.cells.forEach(snapshot => {
+      const cell = cellsById.get(snapshot.id);
+      if (cell) Object.assign(cell, snapshot);
+    });
+    if (drag.controller && manualVariant.controller) Object.assign(manualVariant.controller, drag.controller);
+    manualGridOrigin = { ...drag.origin };
+    manualGridAngle = drag.gridAngle;
+    const svg = $("drawing");
+    if (svg?.hasPointerCapture?.(drag.pointerId)) svg.releasePointerCapture(drag.pointerId);
+    if (manualPointerFrame !== null) cancelAnimationFrame(manualPointerFrame);
+    manualPointerFrame = null;
+    manualPendingPointer = null;
+    manualDrag = null;
+    render();
+    return true;
   }
 
   function manualSelectionCells() {
@@ -836,6 +1367,57 @@
     if (!manualMode || !manualVariant) return;
     manualSelectedCellIds = new Set(manualVariant.cells.map(c => c.id));
     manualControllerSelected = Boolean(manualVariant.controller);
+    render();
+  }
+
+  function nudgeManualSelection(dx, dy) {
+    if (!manualMode || !manualVariant || (!manualSelectedCellIds.size && !manualControllerSelected)) return;
+    const before = manualSnapshot();
+    const cells = manualSelectionCells();
+    const allCellsSelected = cells.length === manualVariant.cells.length && cells.length > 0;
+    if (cells.length && !allCellsSelected) {
+      const horizontalSteps = dx ? Math.sign(dx) * (Math.abs(dx) > 1 ? 10 : 1) : 0;
+      const verticalSteps = dy ? Math.sign(dy) * (Math.abs(dy) > 1 ? 10 : 1) : 0;
+      const candidates = cells.map(cell => {
+        const slot = manualCellGridSlot(cell);
+        const row = slot.row + verticalSteps, col = slot.col + horizontalSteps;
+        return { cell, row, col, point: manualGridPoint(row, col), source: slot };
+      });
+      if (!manualSelectionCanOccupy(candidates, manualSelectedCellIds)) return;
+      candidates.forEach(({ cell, row, col, point }) => Object.assign(cell, { x: point.x, y: point.y, row, col }));
+      if (manualControllerSelected && manualVariant.controller && candidates.length) {
+        const moveX = candidates[0].point.x - candidates[0].source.x;
+        const moveY = candidates[0].point.y - candidates[0].source.y;
+        manualVariant.controller.cx = roundManualMillimetres(manualVariant.controller.cx + moveX);
+        manualVariant.controller.cy = roundManualMillimetres(manualVariant.controller.cy + moveY);
+      }
+    } else {
+      if (allCellsSelected) {
+        const slots = cells.map(cell => ({ cell, slot: manualCellGridSlot(cell) }));
+        manualGridOrigin.x = roundManualMillimetres(manualGridOrigin.x + dx);
+        manualGridOrigin.y = roundManualMillimetres(manualGridOrigin.y + dy);
+        slots.forEach(({ cell, slot }) => {
+          const point = manualGridPoint(slot.row, slot.col);
+          Object.assign(cell, { x: point.x, y: point.y, row: slot.row, col: slot.col });
+        });
+      }
+      if (manualControllerSelected && manualVariant.controller) {
+        manualVariant.controller.cx = roundManualMillimetres(manualVariant.controller.cx + dx);
+        manualVariant.controller.cy = roundManualMillimetres(manualVariant.controller.cy + dy);
+      }
+    }
+    commitManualHistory(before);
+    render();
+  }
+
+  function deleteManualSelection() {
+    if (!manualMode || !manualVariant || (!manualSelectedCellIds.size && !manualControllerSelected)) return;
+    const before = manualSnapshot();
+    if (manualSelectedCellIds.size) manualVariant.cells = manualVariant.cells.filter(cell => !manualSelectedCellIds.has(cell.id));
+    if (manualControllerSelected) manualVariant.controller = null;
+    manualSelectedCellIds.clear();
+    manualControllerSelected = false;
+    commitManualHistory(before);
     render();
   }
 
