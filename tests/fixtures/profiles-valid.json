@@ -1,0 +1,44 @@
+{
+  "schema": "ebike-battery-cell-profiles",
+  "version": 1,
+  "profiles": [
+    {
+      "id": "qa-valid-profile",
+      "name": "QA poprawny profil",
+      "formatId": "21700",
+      "manufacturer": "QA",
+      "modelName": "Valid",
+      "notes": "Profil regresyjny importu.",
+      "geometry": { "diameterMm": 21, "heightMm": 70, "massKg": 0.07 },
+      "model": {
+        "chemistryId": "NMC_NCA",
+        "capacityAh": 5,
+        "voltageMinV": 2.8,
+        "voltageNominalV": 3.6,
+        "voltageMaxV": 4.2,
+        "resistanceMohm": 20,
+        "resistanceKind": "dcir",
+        "standardDischargeA": 5,
+        "maxDischargeA": 10,
+        "standardChargeA": 2,
+        "maxChargeA": 5,
+        "specificHeatJkgK": 1000,
+        "heatTransferWm2K": 8,
+        "initialSocPercent": 100,
+        "initialTemperatureC": 25,
+        "stateOfHealthPercent": 100,
+        "spreadCapacityPercent": 2,
+        "spreadDcirPercent": 5,
+        "spreadSocPercent": 0.5,
+        "ocvMode": "custom",
+        "ocvPoints": "0:2.8; 50:3.6; 100:4.2",
+        "resistanceSocPoints": "0:1.2; 100:1",
+        "resistanceTempPoints": "-10:1.5; 25:1",
+        "capacityTempPoints": "-10:0.7; 25:1",
+        "chargeTempPoints": "-10:0; 25:1",
+        "r1Fraction": 0.35,
+        "tau1S": 18
+      }
+    }
+  ]
+}

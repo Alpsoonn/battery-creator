@@ -1,0 +1,9 @@
+# Lokalne pliki narzędzi i sesji
+.agents/
+.codex-tmp/
+
+# Logi lokalnych serwerów i testów przeglądarkowych
+*.log
+
+# Robocze kopie dużego pliku wejściowego
+index.backup*.html
