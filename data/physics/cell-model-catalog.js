@@ -49,6 +49,9 @@
       })
     }),
     default_spread_percent: Object.freeze({ capacity: 2, dcir: 5, initial_soc: 0.5 }),
-    dcir_acir_estimation: Object.freeze({ multiplier: 1.35, note_pl: "ACIR 1 kHz jest tylko przybliżeniem; domyślne DCIR przyjmowane jest wyżej." })
+    dcir_acir_estimation: Object.freeze({
+      multiplier: 1.75,
+      note_pl: "ACIR 1 kHz opisuje impedancję dla małego sygnału. Do modelu długiego impulsu i nagrzewania przyjmowane jest DCIR = ACIR × 1,75; dynamiczna gałąź R1-C1 pozostaje liczona osobno."
+    })
   });
 })(window);
